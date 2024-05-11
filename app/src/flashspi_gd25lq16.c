@@ -2,10 +2,10 @@
 #include "at32_spiflash.h"
 #include <stdio.h>
 
-#define GD25LQ16_ID             0xc814
+#define GD25LQ16_M_ID           0xC814
 #define GD25LQ16_PAGE_SIZE      256
 #define GD25LQ16_SECTOR_SIZE    0x1000
-#define GD25LQ16_SIZE           0x00200000 /*2m byte*/
+#define GD25LQ16_SIZE           0x00200000 /* 2MB */
 
 //#define GD25LQ16_SR_VOLATILE
 
@@ -46,7 +46,7 @@ static void gd25lq16_cmd_wrsr(uint16_t sr_data)
     #ifdef GD25LQ16_SR_VOLATILE
     gd25lq16_cmd_vsrwren();
     #else
-    flash_spi_writeenable();
+    flashspi_writeenable();
     #endif
 
     spiflash_cs (CS_LOW);
@@ -88,7 +88,7 @@ static uint16_t gd25lq16_rdsr_ex(void)
     return sr;
 }
 
-static flashspi_error_t gd25lq16_init(void)
+static flashspi_res_t gd25lq16_init(void)
 {
     uint16_t sr;
     
@@ -102,11 +102,18 @@ static flashspi_error_t gd25lq16_init(void)
     return FLASHSPI_OK;
 }
 
+static flashspi_res_t gd25lq16_erase(void)
+{
+    return FLASHSPI_ERROR;
+}
+
 const flashspi_t gd25lq16 = 
 {
-    .id = GD25LQ16_ID,
+    .name = "GD25LQ16",
+    .mid = GD25LQ16_M_ID,
     .size = GD25LQ16_SIZE,
     .pagesize = GD25LQ16_PAGE_SIZE,
     .sectorsize = GD25LQ16_SECTOR_SIZE,
-    .init = gd25lq16_init
+    .init = gd25lq16_init,
+    .erase = gd25lq16_erase
 };

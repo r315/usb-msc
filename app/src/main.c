@@ -34,6 +34,7 @@
 #include "cdc_msc_desc.h"
 #include "msc_diskio.h"
 #include "usbd_int.h"
+#include "flashspi.h"
 
 typedef struct
 {
@@ -173,6 +174,49 @@ static int resetCmd(int argc, char **argv)
     return CLI_OK;
 }
 
+static int flashCmd(int argc, char **argv)
+{
+    flashspi_res_t res;
+
+    if(argc < 2){
+        printf("usage: flash <info|erase|fs>\n");
+        return CLI_OK_LF;
+    }
+
+    const flashspi_t *fls = flashspi_get();
+
+    if(!fls){
+        printf("No spi flash detected\n");
+        return CLI_OK;
+    }
+
+    if(!strcmp(argv[1], "info")){
+        printf("Name: %s\n", fls->name);
+        printf("Total size: %u (0x%08X) bytes\n", (unsigned int)fls->size, (unsigned int)fls->size);
+        printf("Sector size: %u (0x%04X) bytes\n",  (unsigned int)fls->sectorsize,  (unsigned int)fls->sectorsize);
+        printf("Page size: %u (0x%02X) bytes\n",  (unsigned int)fls->pagesize,  (unsigned int)fls->pagesize);
+        return CLI_OK;
+    }
+    
+    if(!strcmp(argv[1], "erase")) {
+        res = flashspi_erase();
+        if(res != FLASHSPI_OK)
+            printf("Error %d\n", res);
+        return CLI_OK;
+    }
+    
+    if(!strcmp(argv[1], "fs")) {
+        #if FF_USE_MKFS
+        f_mkfs("0:", FM_FAT, NULL, fls->sectorsize);
+        #else
+        printf("f_mkfs not enabled\n");
+        #endif
+        return CLI_OK;
+    }
+
+    return CLI_BAD_PARAM;
+}
+
 static int unplugCmd(int argc, char **argv)
 {
     usb_unplug();
@@ -204,6 +248,7 @@ cli_command_t cli_cmds [] = {
     {"mount", mountCmd},
     {"list", listCmd},
     {"cat", catCmd},
+    {"flash", flashCmd},
 };
 #endif
 

@@ -55,7 +55,7 @@ DSTATUS disk_initialize (
          break;
 
       case SPI_FLASH:
-         if ((DRESULT) flash_spi_init () == RES_OK)
+         if ((DRESULT) flashspi_init () == RES_OK)
          {
             status &= ~STA_NOINIT;
          }         
@@ -87,7 +87,7 @@ DRESULT disk_read (BYTE pdrv,  /* Physical drive nmuber to identify the drive */
          break;
       
       case SPI_FLASH:
-         status = (DRESULT) flash_spi_read (buff, sector * 512, count * 512);
+         status = (DRESULT) flashspi_read (buff, sector * 512, count * 512);
          break;
 
       default:
@@ -123,7 +123,7 @@ DRESULT disk_write (BYTE pdrv, /* Physical drive nmuber to identify the drive */
          break;
 
       case SPI_FLASH:
-         status = (DRESULT) flash_spi_write (buff, sector * 512, count * 512);
+         status = (DRESULT) flashspi_write (buff, sector * 512, count * 512);
          break;
 
       default:
@@ -186,11 +186,11 @@ DRESULT disk_ioctl (BYTE pdrv, /* Physical drive nmuber (0..) */
                status          = RES_OK;
                break;
             case GET_SECTOR_COUNT:
-               *(DWORD *) buff =  flash_spi_getsize () / 512;
+               *(DWORD *) buff =  flashspi_getsize () / 512;
                status          = RES_OK;
                break;
             case GET_BLOCK_SIZE:
-               *(DWORD *) buff =  flash_spi_getsize ();
+               *(DWORD *) buff =  flashspi_getsize ();
                status          = RES_OK;
                break;
             default:

@@ -12,23 +12,30 @@
 #define FLASH_SPI_CMD_RDID      0x9F  /*!< Read ID (JEDEC Manufacturer ID and JEDEC CFI) */
 
 typedef enum {
-    FLASHSPI_OK = 0,
-    FLASHSPI_ERROR
-}flashspi_error_t;
+    FLASHSPI_OK = 0,            /* (0) Success */
+    FLASHSPI_ERROR,             /* (1) Generic error */
+    FLASHSPI_ERROR_ID,          /* (2) ID mismatch */
+    FLASHSPI_ERROR_TIMEOUT,     /* (3) Operation timedout */
+}flashspi_res_t;
 
 typedef struct {
+    const char *name;
     const uint32_t size;
     const uint32_t sectorsize;
     const uint32_t pagesize;
-    const uint32_t id;
-    flashspi_error_t (*init)(void);
+    const uint32_t mid;             // Manufacturer/id
+    flashspi_res_t (*init)(void);
+    flashspi_res_t (*erase)(void);
 }flashspi_t;
 
-flashspi_error_t flash_spi_init(void);
-flashspi_error_t flash_spi_write(const uint8_t* pbuffer, uint32_t writeaddr, uint16_t numbytetowrite);
-flashspi_error_t flash_spi_read(uint8_t* pbuffer, uint32_t readaddr, uint16_t numbytetoread);
-uint32_t flash_spi_getsize(void);
-uint32_t flash_spi_getsectorsize(void);
-uint32_t flash_spi_getpagesize(void);
-void flash_spi_writeenable(void);
+flashspi_res_t flashspi_init(void);
+flashspi_res_t flashspi_write(const uint8_t* pbuffer, uint32_t writeaddr, uint16_t numbytetowrite);
+flashspi_res_t flashspi_read(uint8_t* pbuffer, uint32_t readaddr, uint16_t numbytetoread);
+void flashspi_writeenable(void);
+uint32_t flashspi_getsize(void);
+uint32_t flashspi_getsectorsize(void);
+uint32_t flashspi_getpagesize(void);
+const char* flashspi_getname (void);
+const flashspi_t *flashspi_get(void);
+flashspi_res_t flashspi_erase(void);
 #endif

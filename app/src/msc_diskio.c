@@ -96,19 +96,18 @@ usb_sts_type msc_init (uint8_t lun)
 {
    switch (lun)
    {
-      case INTERNAL_FLASH_LUN:
-         break;
       case SPI_FLASH_LUN:
-         flash_spi_init ();
-         break;
+         return flashspi_init ();
+         
       case SD_CARD_LUN:
-         sd_init ();
-         break;
+         return sd_init ();
+      
+      case INTERNAL_FLASH_LUN:
       default:
          break;
    }
 
-   return USB_OK;
+   return USB_ERROR;
 }
 
 /**
@@ -142,7 +141,7 @@ usb_sts_type msc_disk_read (uint8_t lun, uint32_t addr, uint8_t *read_buf,
       case INTERNAL_FLASH_LUN:
          break;
       case SPI_FLASH_LUN:
-         res = (usb_sts_type) flash_spi_read (read_buf, addr, len);
+         res = (usb_sts_type) flashspi_read (read_buf, addr, len);
          break;
       case SD_CARD_LUN:
          res = (usb_sts_type) sd_read_disk (read_buf, addr / 512, len / 512);
@@ -171,7 +170,7 @@ usb_sts_type msc_disk_write (uint8_t lun, uint32_t addr, uint8_t *buf,
       case INTERNAL_FLASH_LUN:
          break;
       case SPI_FLASH_LUN:
-         res = (usb_sts_type) flash_spi_write (buf, addr, len);
+         res = (usb_sts_type) flashspi_write (buf, addr, len);
          break;
       case SD_CARD_LUN:
          res = (usb_sts_type) sd_write_disk (buf, addr / 512, len / 512);
@@ -198,14 +197,15 @@ usb_sts_type msc_disk_capacity (uint8_t lun, uint32_t *blk_nbr,
          break;
       case SPI_FLASH_LUN:
          *blk_size = 512;
-         *blk_nbr  = flash_spi_getsize () / *blk_size;
+         *blk_nbr  = flashspi_getsize () / *blk_size;
          break;
       case SD_CARD_LUN:
          *blk_size = 512;
          *blk_nbr  = sd_card_info.card_capacity / *blk_size;
          break;
+
       default:
-         break;
+         return USB_ERROR;
    }
    return USB_OK;
 }

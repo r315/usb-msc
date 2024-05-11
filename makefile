@@ -74,7 +74,7 @@ $(APP_PATH)/src/at32_sdio.c \
 $(APP_PATH)/src/at32_spiflash.c \
 $(APP_PATH)/src/flashspi.c \
 $(APP_PATH)/src/flashspi_gd25lq16.c \
-$(APP_PATH)/src/flashspi_w25q64_128.c \
+$(APP_PATH)/src/flashspi_winbond.c \
 
 #$(MIDDLEWARES_PATH)/usbd_class/msc/msc_desc.c \
 $(MIDDLEWARES_PATH)/usbd_class/msc/msc_class.c \

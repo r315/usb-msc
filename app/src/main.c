@@ -26,6 +26,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include "415dk_board.h"
 #include "cli_simple.h"
 #include "ff.h"
@@ -91,7 +92,7 @@ void usb_config(void)
         );
 }
 
-#ifdef FEATURE_CLI
+#ifdef ENABLE_CLI
 static int listCmd(int argc, char **argv)
 {
     FRESULT res;
@@ -246,10 +247,14 @@ FRESULT mount(TCHAR *path, uint8_t m)
         if(r != FR_OK){
             printf("fail: %d\n", r);
         }else{
-            getDiskSize(path, &disk_size);
-            printf("ok\n"
-                   "\tDisk size: %luk\n", disk_size.totalsize);
-            printf("\t     Free: %luk\n", disk_size.freesize);
+            r = getDiskSize(path, &disk_size);
+            if(r == FR_OK){
+                printf("ok\n"
+                       "\tDisk size: %luk\n", disk_size.totalsize);
+                printf("\t     Free: %luk\n", disk_size.freesize);
+            }else{
+                printf("FRESULT Error: %d\n", r);
+            }
         }
     }else{
         r = f_mount(NULL, "0:" ,0);
@@ -277,23 +282,24 @@ int main(void)
 
 	system_clock_config();
 
+    system_tick_init();
+
 	NVIC_SetPriorityGrouping(NVIC_PRIORITY_GROUP_4);
 
-    #ifdef FEATURE_CLI
+    #ifdef ENABLE_CLI
     extern void serial_init(void);
     serial_init();
 
     CLI_Init("msd >");
     CLI_RegisterCommand(cli_cmds, sizeof(cli_cmds) / sizeof(cli_command_t));
     printf("\rType 'help' for available commands\n");
-    #else
-
-    //mount(1);
-	usb_config();
-
-    #endif
 
     msc_init(0);
+
+    #else
+    //mount(1);
+	usb_config();
+    #endif
 
     int i = 0;
     uint8_t buf[64];
@@ -303,7 +309,7 @@ int main(void)
 	while(1)
 	{		
         delay_ms(100);
-        #if FEATURE_CLI
+        #if ENABLE_CLI
         if(CLI_ReadLine()){
             CLI_HandleLine();
         }

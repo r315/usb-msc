@@ -13,8 +13,10 @@
 
 void at32_board_init(void);
 void system_clock_config(void);
+void system_tick_init(void);
 void delay_init(void);
 void delay_ms(uint32_t ms);
+uint32_t get_tick(void);
 void usb_clock48m_select(usb_clk48_s clk_s);
 void usb_gpio_config(void);
 void usb_gpio_deinit(void);

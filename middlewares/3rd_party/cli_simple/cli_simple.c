@@ -661,7 +661,7 @@ cli_result_t CLI_ReadLine (void)
          {
             if (CliLineLen < sizeof (CliLineBuffer))
             {
-               if(CliEdit){
+               if(!CliEdit){
                   CliLineBuffer[CliLineLen++] = Data;
                   putchar (Data);
                }else{

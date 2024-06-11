@@ -19,7 +19,7 @@ The supported devices are sdcard <4GB and spi flash.
 
 ## SPI Flash
 <pre>
-    spi1                     at32f415            sd/mmc card
+    spi1                     at32f415            spi flash
   - cs                          PA4          --->   nCS
   - sck                         PA5          --->   SCLK
   - miso                        PA6          <---   DO

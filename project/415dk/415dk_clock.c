@@ -108,3 +108,8 @@ void usb_clock48m_select(usb_clk48_s clk_s)
 
   }
 }
+
+void system_tick_init(void)
+{
+    SysTick_Config((system_core_clock / 1000) - 1); // config 1000us
+}

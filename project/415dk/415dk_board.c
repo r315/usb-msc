@@ -21,11 +21,16 @@ void delay_us(uint32_t us)
     while(SysTick->VAL == systick);
 }
 
+uint32_t get_tick(void)
+{
+    return ticms;
+}
+
 void at32_board_init(void)
 {
     SystemInit();
     system_core_clock_update();
-    SysTick_Config((system_core_clock / 1000) - 1); // config 1000us
+    system_tick_init();
     LED1_INIT;
 }
 

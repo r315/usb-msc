@@ -8,9 +8,7 @@ TARGET =usb-msc
 #######################################
 
 FEATURE_ENABLE = \
-FEATURE_CLI \
-_FEATURE_FF \
-_AT32_SPI2 \
+ENABLE_CLI
 
 #######################################
 # paths
@@ -76,7 +74,7 @@ $(APP_PATH)/src/at32_sdio.c \
 $(APP_PATH)/src/at32_spiflash.c \
 $(APP_PATH)/src/flashspi.c \
 $(APP_PATH)/src/flashspi_gd25lq16.c \
-$(APP_PATH)/src/flashspi_w25q64_128.c \
+$(APP_PATH)/src/flashspi_winbond.c \
 
 #$(MIDDLEWARES_PATH)/usbd_class/msc/msc_desc.c \
 $(MIDDLEWARES_PATH)/usbd_class/msc/msc_class.c \
@@ -181,14 +179,15 @@ HEX = $(OBJCOPY) -O ihex
 BIN = $(OBJCOPY) -O binary -S
 
 ifeq ($(shell uname -s), Linux)
-JLK ="/opt/SEGGER/JLink/JLinkExe"
-PRG_CFG =$(TARGET).elf
-PRG_CMD =openocd -f $(OCD_CONFIG) -c "program $(BUILD_PATH)/$(TARGET).elf verify reset exit"
-ERASE_CMD =openocd -f $(OCD_CONFIG) -c "init" -c "halt" -c "stm32f1x unlock 0" -c "stm32f1x mass_erase 0" -c "exit"
+PRG_DEP =bin
+PRG_CFG =$(PROJECT_PATH)/$(TARGET).elf
+PRG_CMD =openocd -f $(PRG_CFG) -c "program $(BUILD_PATH)/$(TARGET).elf verify reset exit"
+ERASE_CMD =openocd -f $(PRG_CFG) -c "init" -c "halt" -c "stm32f1x unlock 0" -c "stm32f1x mass_erase 0" -c "exit"
 else
-JLK =jlink
-PRG_CFG = $(TARGET).jlink
-PRG_CMD = $(VERBOSE)$(JLK) -device $(DEVICE) -if SWD -speed auto -CommanderScript $(BUILD_PATH)/$(PRG_CFG)
+JLK :=JLink
+PRG_DEP =bin $(PRG_CFG)
+PRG_CFG =$(BUILD_DIR)/$(TARGET).jlink
+PRG_CMD =$(VERBOSE)$(JLK) -device $(DEVICE) -if SWD -speed auto -CommanderScript $(PRG_CFG)
 #-device CORTEX-M4
 endif
 
@@ -213,13 +212,13 @@ $(TARGET): $(BUILD_PATH)/$(TARGET).elf
 
 bin: $(BUILD_PATH)/$(TARGET).bin
 
-program: default $(BUILD_PATH)/$(PRG_CFG)
+program: default $(PRG_DEP)
 	$(PRG_CMD)
 
 erase:
 	$(ERASE_CMD)
 
-$(BUILD_PATH)/$(TARGET).jlink: bin
+$(BUILD_PATH)/$(TARGET).jlink: $(BUILD_DIR)/$(TARGET).bin
 	@echo "Creating Jlink configuration file"
 	@echo "loadfile $< 0x08000000" > $@
 	@echo "r" >> $@

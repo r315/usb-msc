@@ -1,22 +1,28 @@
 #include <stddef.h>
 #include "flashspi.h"
 #include "at32_spiflash.h"
+#include "415dk_board.h"
 
-#define FLASH_DEVICES_COUNT sizeof (flash_spi_devices) / sizeof (flashspi_t *)
+#define FLASH_DEVICES_COUNT sizeof (flashspi_devices) / sizeof (flashspi_t *)
 
-static uint32_t flash_spi_getid (void);
-
-static void flash_spi_erasesector (uint32_t sectoraddr);
-static void flash_spi_waitforwriteend (void);
-static void flash_spi_writepage (const uint8_t *pbuffer, uint32_t writeaddr, uint16_t numbytetowrite);
-static void flash_spi_writebuffer (const uint8_t *pbuffer, uint32_t writeaddr, uint16_t numbytetowrite);
+static uint32_t flashspi_read_id (void);
+static void flashspi_erasesector (uint32_t sectoraddr);
+static void flashspi_waitforwriteend (void);
+static void flashspi_writepage (const uint8_t *pbuffer, uint32_t writeaddr, uint16_t numbytetowrite);
+static void flashspi_writebuffer (const uint8_t *pbuffer, uint32_t writeaddr, uint16_t numbytetowrite);
 
 extern const flashspi_t gd25lq16;
 extern const flashspi_t w25q64;
 extern const flashspi_t w25q128;
+extern const flashspi_t w25x32;
 
 static const flashspi_t *spiflash;
-static const flashspi_t *flash_spi_devices[] = {&gd25lq16, &w25q64, &w25q128};
+static const flashspi_t *flashspi_devices[] = {
+    &gd25lq16, 
+    &w25q64, 
+    &w25q128,
+    &w25x32
+};
 
 /**
  * @brief Calls SOC low level spi initialization and select flash
@@ -24,19 +30,19 @@ static const flashspi_t *flash_spi_devices[] = {&gd25lq16, &w25q64, &w25q128};
  * @param  None
  * @retval None
  */
-flashspi_error_t flash_spi_init (void)
+flashspi_res_t flashspi_init (void)
 {
    spiflash_init ();
 
-   uint32_t device_id = flash_spi_getid ();
+   uint32_t device_id = flashspi_read_id ();
 
    spiflash = NULL;
 
    for (uint8_t i = 0; i < FLASH_DEVICES_COUNT; i++)
    {
-      if (flash_spi_devices[i]->id == device_id)
+      if (flashspi_devices[i]->mid == device_id)
       {
-         spiflash = flash_spi_devices[i];
+         spiflash = flashspi_devices[i];
          break;
       }
    }
@@ -49,11 +55,21 @@ flashspi_error_t flash_spi_init (void)
 }
 
 /**
+ * @brief  Get current active spi flash device.
+ * @param  None
+ * @retval 
+ */
+const flashspi_t *flashspi_get (void)
+{
+   return spiflash;
+}
+
+/**
  * @brief  Get FLASH SIZE.
  * @param  None
  * @retval FLASH identification
  */
-uint32_t flash_spi_getsize (void)
+uint32_t flashspi_getsize (void)
 {
    return (spiflash) ? spiflash->size : 0;
 }
@@ -63,7 +79,7 @@ uint32_t flash_spi_getsize (void)
  * @param  None
  * @retval FLASH identification
  */
-uint32_t flash_spi_getsectorsize (void)
+uint32_t flashspi_getsectorsize (void)
 {
    return (spiflash) ? spiflash->sectorsize : 0;
 }
@@ -73,9 +89,19 @@ uint32_t flash_spi_getsectorsize (void)
  * @param  None
  * @retval FLASH identification
  */
-uint32_t flash_spi_getpagesize (void)
+uint32_t flashspi_getpagesize (void)
 {
    return (spiflash) ? spiflash->pagesize : 0;
+}
+
+/**
+ * @brief  Get FLASH Page SIZE.
+ * @param  None
+ * @retval FLASH identification
+ */
+const char* flashspi_getname (void)
+{
+   return (spiflash) ? spiflash->name : "";
 }
 
 /**
@@ -86,7 +112,7 @@ uint32_t flash_spi_getpagesize (void)
  * @param  NumByteToRead: number of bytes to read from the FLASH.
  * @retval None
  */
-flashspi_error_t flash_spi_read (uint8_t *pbuffer, uint32_t readaddr,
+flashspi_res_t flashspi_read (uint8_t *pbuffer, uint32_t readaddr,
                      uint16_t numbytetoread)
 {
    /*!< select the flash: chip select low */
@@ -124,7 +150,7 @@ flashspi_error_t flash_spi_read (uint8_t *pbuffer, uint32_t readaddr,
  * @param  NumByteToWrite: number of bytes to write to the FLASH.
  * @retval None
  */
-flashspi_error_t flash_spi_write (const uint8_t *pbuffer, uint32_t writeaddr,
+flashspi_res_t flashspi_write (const uint8_t *pbuffer, uint32_t writeaddr,
                       uint16_t numbytetowrite)
 {
    uint32_t cnt = 0;
@@ -143,7 +169,7 @@ flashspi_error_t flash_spi_write (const uint8_t *pbuffer, uint32_t writeaddr,
    while (1)
    {
       /*read all sector data*/
-      flash_spi_read (gtmpbuff, sectornum * spiflash->sectorsize,
+      flashspi_read (gtmpbuff, sectornum * spiflash->sectorsize,
                       spiflash->sectorsize);
 
       /*check data is 0xff ?*/
@@ -155,15 +181,15 @@ flashspi_error_t flash_spi_write (const uint8_t *pbuffer, uint32_t writeaddr,
 
       if (cnt < sectorremain) /*need sector erase*/
       {
-         flash_spi_erasesector (sectornum * spiflash->sectorsize);
+         flashspi_erasesector (sectornum * spiflash->sectorsize);
          for (cnt = 0; cnt < sectorremain; cnt++)
             gtmpbuff[cnt + sectoroffset] = pbuffer[cnt];
-         flash_spi_writebuffer (gtmpbuff, sectornum * spiflash->sectorsize,
+         flashspi_writebuffer (gtmpbuff, sectornum * spiflash->sectorsize,
                                 spiflash->sectorsize);
       }
       else
       {
-         flash_spi_writebuffer (pbuffer, writeaddr, sectorremain);
+         flashspi_writebuffer (pbuffer, writeaddr, sectorremain);
       }
 
       if (sectorremain == numbytetowrite)
@@ -191,11 +217,25 @@ flashspi_error_t flash_spi_write (const uint8_t *pbuffer, uint32_t writeaddr,
 }
 
 /**
+ * @brief Performs a chip erase
+ * 
+ * @return flashspi_res_t 
+ */
+flashspi_res_t flashspi_erase(void)
+{
+    if(!spiflash){
+        return FLASHSPI_ERROR;
+    }
+
+    return spiflash->erase();
+}
+
+/**
  * @brief  Reads FLASH identification.
  * @param  None
  * @retval FLASH identification
  */
-static uint32_t flash_spi_getid (void)
+static uint32_t flashspi_read_id (void)
 {
    uint16_t flash_id = 0;
    spiflash_cs (CS_LOW);
@@ -218,7 +258,7 @@ static uint32_t flash_spi_getid (void)
  * @param  NumByteToWrite: number of bytes to write to the FLASH.
  * @retval None
  */
-static void flash_spi_writebuffer (const uint8_t *pbuffer, uint32_t writeaddr,
+static void flashspi_writebuffer (const uint8_t *pbuffer, uint32_t writeaddr,
                             uint16_t numbytetowrite)
 {
    uint16_t pager;
@@ -230,7 +270,7 @@ static void flash_spi_writebuffer (const uint8_t *pbuffer, uint32_t writeaddr,
 
    while (1)
    {
-      flash_spi_writepage (pbuffer, writeaddr, pager);
+      flashspi_writepage (pbuffer, writeaddr, pager);
       if (pager == numbytetowrite)
          break;
       else
@@ -257,11 +297,11 @@ static void flash_spi_writebuffer (const uint8_t *pbuffer, uint32_t writeaddr,
  *         or less than "sFLASH_PAGESIZE" value.
  * @retval None
  */
-static void flash_spi_writepage (const uint8_t *pbuffer, uint32_t writeaddr,
+static void flashspi_writepage (const uint8_t *pbuffer, uint32_t writeaddr,
                                  uint16_t numbytetowrite)
 {
    /*!< enable the write access to the flash */
-   flash_spi_writeenable ();
+   flashspi_writeenable ();
 
    /*!< select the flash: chip select low */
    spiflash_cs (CS_LOW);
@@ -287,7 +327,7 @@ static void flash_spi_writepage (const uint8_t *pbuffer, uint32_t writeaddr,
    spiflash_cs (CS_HIGH);
 
    /*!< wait the end of flash writing */
-   flash_spi_waitforwriteend ();
+   flashspi_waitforwriteend ();
 }
 
 /**
@@ -295,7 +335,7 @@ static void flash_spi_writepage (const uint8_t *pbuffer, uint32_t writeaddr,
  * @param  None
  * @retval None
  */
-void flash_spi_writeenable (void)
+void flashspi_writeenable (void)
 {
    /*!< Select the FLASH: Chip Select low */
    spiflash_cs (CS_LOW);
@@ -313,7 +353,7 @@ void flash_spi_writeenable (void)
  * @param  None
  * @retval None
  */
-static void flash_spi_waitforwriteend (void)
+static void flashspi_waitforwriteend (void)
 {
    uint8_t flashstatus = 0;
 
@@ -341,10 +381,10 @@ static void flash_spi_waitforwriteend (void)
  * @param  SectorAddr: address of the sector to erase.
  * @retval None
  */
-static void flash_spi_erasesector (uint32_t sectoraddr)
+static void flashspi_erasesector (uint32_t sectoraddr)
 {
    /*!< send write enable instruction */
-   flash_spi_writeenable ();
+   flashspi_writeenable ();
 
    /*!< sector erase */
    /*!< select the flash: chip select low */
@@ -361,5 +401,5 @@ static void flash_spi_erasesector (uint32_t sectoraddr)
    spiflash_cs (CS_HIGH);
 
    /*!< wait the end of flash writing */
-   flash_spi_waitforwriteend ();
+   flashspi_waitforwriteend ();
 }

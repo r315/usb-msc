@@ -3,10 +3,14 @@
 #include <stdint.h>
 #include "cli_simple.h"
 
+#define VT100_BOLD   "\e[1m"
+#define VT100_NORMAL "\e[m"
+
 static uint8_t CliLineBuffer[CLI_LINE_MAX_LEN];
 static uint16_t CliLineLen;
 static uint8_t *CliArgv[CLI_CMD_MAX_ARGS];
 static uint32_t CliArgc;
+static uint8_t CliEdit;
 
 static uint16_t CliCommandsCount;
 static cli_history_t History;
@@ -136,19 +140,27 @@ static uint32_t CLI_GetArguments(uint8_t *Buffer, uint8_t **Argv)
  *
  */
 // =============================================================================
-static uint8_t CLI_ReplaceLine(uint8_t *new_line) {
-	uint8_t new_line_len;
+static void CLI_ReplaceLine(uint8_t *new_line) {
+	int new_line_len;
 
-    int len = CliLineLen;
-	
-    while(len--){
-        printf("\b \b");
+    new_line_len = strlen((const char*)new_line);
+
+    if(new_line_len > 0 && new_line_len < CLI_LINE_MAX_LEN){
+    	memcpy(CliLineBuffer, new_line, new_line_len);
+
+      if(CliEdit){
+         printf("\e[%uC", CliEdit);
+         CliEdit = 0;
+      }
+
+      while(CliLineLen--){
+         printf("\b \b");
+      }
+
+      CliLineLen = new_line_len;
+        
+      printf("%s", new_line);
     }
-    
-	new_line_len = printf("%s", new_line);
-	memcpy(CliLineBuffer, new_line, new_line_len);
-
-	return new_line_len;
 }
 
 // =============================================================================
@@ -166,11 +178,15 @@ static uint8_t CLI_ReplaceLine(uint8_t *new_line) {
 // =============================================================================
 static void CLI_Prompt (void)
 {
-   printf(Prompt);
+   printf(
+      VT100_BOLD
+      "%s"
+      VT100_NORMAL
+      ,Prompt);
 }
 
 // =============================================================================
-// CLI_Commands
+// CLI_HistoryInit
 // =============================================================================
 /*!
  *
@@ -292,7 +308,6 @@ static uint8_t *CLI_HistoryGet(cli_history_t *Hist, int8_t Dir)
    
    if(Dir == -1)
    {
-
       if (Hist->size == CLI_HISTORY_SIZE) 
       {
          // History is full, wrap arround is allowed
@@ -320,7 +335,7 @@ static uint8_t *CLI_HistoryGet(cli_history_t *Hist, int8_t Dir)
       
       if(CurIndex == Hist->head){
          // Clear current line to avoid duplicating history navigation
-         memset(Hist->history[Hist->head], '\0', CLI_LINE_MAX_LEN);
+         memset(Hist->history[CurIndex], '\0', CLI_LINE_MAX_LEN);
       }
 
       Hist->index = CurIndex;
@@ -373,6 +388,7 @@ void CLI_Init (const char *prompt)
 
    memset (CliLineBuffer, 0x0, sizeof (CliLineBuffer));
    CliLineLen = 0;
+   CliEdit = 0;
 
    Prompt = prompt;
 
@@ -494,6 +510,7 @@ cli_result_t CLI_ProcessLine (uint8_t *line)
    // Parse splits initial line, it must be cleared in all its length
    memset (line, '\0', CLI_LINE_MAX_LEN);
    CliLineLen = 0;
+   CliEdit = 0;
 
    CLI_Prompt ();
 
@@ -520,7 +537,6 @@ cli_result_t CLI_HandleLine (void)
    return CLI_ProcessLine(CliLineBuffer);
 }
 
-uint32_t serial_write(const uint8_t *buf, uint32_t len);
 // =============================================================================
 // CLI_ReadLine
 // =============================================================================
@@ -558,19 +574,27 @@ cli_result_t CLI_ReadLine (void)
          {
             case 'A':
                //puts ("UP");
-               CliLineLen = CLI_ReplaceLine(CLI_HistoryGet(&History, -1));
+               CLI_ReplaceLine(CLI_HistoryGet(&History, -1));               
                break;
 
             case 'B':
                //puts ("DOWN");
-               CliLineLen = CLI_ReplaceLine(CLI_HistoryGet(&History, 1));
+               CLI_ReplaceLine(CLI_HistoryGet(&History, 1));               
                break;
 
-            case 'C':
+            case 'C':            
                //puts ("RIGTH");
+               if(CliEdit > 0){
+                  printf("\e[1C");
+                  CliEdit--;
+               }
                break;
             case 'D':
                //puts ("LEFT");
+               if(CliEdit < CliLineLen){
+                  printf("\e[1D");
+                  CliEdit++;
+               }
                break;
             default:
                break;
@@ -595,9 +619,32 @@ cli_result_t CLI_ReadLine (void)
          {
             if (CliLineLen > 0)
             {
-               putchar('\b');
-               putchar(' ');
-               putchar('\b');
+               if(!CliEdit){
+                  putchar('\b');
+                  putchar(' ');
+                  putchar('\b');                  
+               }else{
+                  uint8_t offset = CliLineLen - CliEdit;
+
+                  if((CliLineLen - CliEdit) == 0){
+                     // We are at prompt end, dont allow backspace
+                     break;
+                  }
+
+                  // move cursor one character to left
+                  putchar('\b');
+
+                  // Move and print remaning string
+                  for(uint8_t i = 0; i < CliEdit; i++){
+                     CliLineBuffer[offset + i - 1] = CliLineBuffer[offset + i];
+                     putchar (CliLineBuffer[offset + i]);
+                  }
+
+                  // Erase last character
+                  putchar(' ');
+                  // Move cursor back to edit position                  
+                  printf("\e[%uD", CliEdit + 1);
+               }
                CliLineLen--;
             }
             break;
@@ -614,8 +661,29 @@ cli_result_t CLI_ReadLine (void)
          {
             if (CliLineLen < sizeof (CliLineBuffer))
             {
-               CliLineBuffer[CliLineLen++] = Data;
-               putchar (Data);
+               if(CliEdit){
+                  CliLineBuffer[CliLineLen++] = Data;
+                  putchar (Data);
+               }else{
+                  uint8_t offset = CliLineLen - CliEdit;
+                 
+                  // Move and print remaning string in buffer
+                  for(uint8_t i = 0; i < CliEdit; i++){
+                     CliLineBuffer[CliLineLen - i] = CliLineBuffer[CliLineLen - 1 - i];
+                  }
+                  // Insert entered character and increment current line len
+                  CliLineBuffer[offset] = Data;
+
+                  // Print remanig string with new character already inserted
+                  for(uint8_t i = 0; i < CliEdit + 1; i++){
+                     putchar(CliLineBuffer[offset + i]);
+                  }                  
+                  
+                  // Move cursor back to edit position
+                  printf("\e[%uD", CliEdit);
+                  
+                  CliLineLen++;
+               }
             }
             break;
          }

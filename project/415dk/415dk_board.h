@@ -21,4 +21,9 @@ void usb_clock48m_select(usb_clk48_s clk_s);
 void usb_gpio_config(void);
 void usb_gpio_deinit(void);
 void sw_reset(void);
+
+extern void serial_init(void);
+extern uint32_t serial_available(void);
+extern uint32_t serial_write(const uint8_t *buf, uint32_t len);
+extern uint32_t serial_read(uint8_t *data, uint32_t len);
 #endif

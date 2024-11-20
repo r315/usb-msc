@@ -1,11 +1,20 @@
+#include <string.h>
 #include "415dk_board.h"
 #include "at32_sdio.h"
-#include <string.h>
+#include "syscalls.h"
+
+
+static stdout_ops_t stdout_ops_serial = {
+    .init = serial_init,
+    .available = serial_available,
+    .read = serial_read,
+    .write = serial_write
+};
 
 static volatile uint32_t ticms;
 
 void SysTick_Handler(void)
-{ 
+{
     ticms++;
 }
 
@@ -31,6 +40,8 @@ void at32_board_init(void)
     SystemInit();
     system_core_clock_update();
     system_tick_init();
+
+    redirect_stdout(&stdout_ops_serial);
     LED1_INIT;
 }
 

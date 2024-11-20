@@ -33,6 +33,7 @@ $(DRIVERS_CMSIS_PATH)/device_support \
 $(DRIVERS_CMSIS_PATH)/core_support \
 $(MIDDLEWARES_PATH)/usb_drivers/inc \
 $(MIDDLEWARES_PATH)/usbd_class/composite_cdc_msc \
+$(MIDDLEWARES_PATH)/usbd_class/msc \
 $(MIDDLEWARES_PATH)/3rd_party/fatfs/source \
 $(MIDDLEWARES_PATH)/3rd_party/cli-simple \
 project/415dk \
@@ -43,12 +44,8 @@ AS_INCLUDES =\
 ######################################
 # Sources
 ######################################
-CSRCS = \
-$(DRIVERS_CMSIS_PATH)/device_support/startup/system_at32f415.c\
-$(DRIVERS_CMSIS_PATH)/device_support/startup/startup_at32f415cbt7.c\
-project/415dk/415dk_board.c \
-project/415dk/415dk_clock.c \
-project/415dk/415dk_serial.c \
+
+CSRCS_PERIPHERALS =\
 $(DRIVERS_PER_PATH)/src/at32f415_usb.c \
 $(DRIVERS_PER_PATH)/src/at32f415_crm.c \
 $(DRIVERS_PER_PATH)/src/at32f415_gpio.c \
@@ -56,13 +53,37 @@ $(DRIVERS_PER_PATH)/src/at32f415_dma.c \
 $(DRIVERS_PER_PATH)/src/at32f415_misc.c \
 $(DRIVERS_PER_PATH)/src/at32f415_sdio.c \
 $(DRIVERS_PER_PATH)/src/at32f415_spi.c \
+
+CSRCS_BOARD =\
+$(DRIVERS_CMSIS_PATH)/device_support/startup/system_at32f415.c\
+$(DRIVERS_CMSIS_PATH)/device_support/startup/startup_at32f415cbt7.c\
+project/415dk/415dk_board.c \
+project/415dk/415dk_clock.c \
+project/415dk/415dk_serial.c \
+
+CSRCS_USB_CDC_MSC =\
+$(MIDDLEWARES_PATH)/usbd_class/composite_cdc_msc/cdc_msc_desc.c \
+$(MIDDLEWARES_PATH)/usbd_class/composite_cdc_msc/cdc_msc_class.c \
+$(MIDDLEWARES_PATH)/usbd_class/composite_cdc_msc/cdc_msc_bot_scsi.c
+
+CSRCS_USB_MSC =\
+$(MIDDLEWARES_PATH)/usbd_class/msc/msc_desc.c \
+$(MIDDLEWARES_PATH)/usbd_class/msc/msc_class.c \
+$(MIDDLEWARES_PATH)/usbd_class/msc/msc_bot_scsi.c \
+#$(APP_PATH)/src/msc_diskio_sdcard.c \
+
+CSRCS_USB =\
 $(MIDDLEWARES_PATH)/usb_drivers/src/usb_core.c \
 $(MIDDLEWARES_PATH)/usb_drivers/src/usbd_core.c \
 $(MIDDLEWARES_PATH)/usb_drivers/src/usbd_sdr.c \
 $(MIDDLEWARES_PATH)/usb_drivers/src/usbd_int.c \
-$(MIDDLEWARES_PATH)/usbd_class/composite_cdc_msc/cdc_msc_desc.c \
-$(MIDDLEWARES_PATH)/usbd_class/composite_cdc_msc/cdc_msc_class.c \
-$(MIDDLEWARES_PATH)/usbd_class/composite_cdc_msc/cdc_msc_bot_scsi.c \
+$(CSRCS_USB_MSC) \
+
+
+CSRCS = \
+$(CSRCS_BOARD) \
+$(CSRCS_PERIPHERALS) \
+$(CSRCS_USB) \
 $(MIDDLEWARES_PATH)/3rd_party/fatfs/source/ff.c \
 $(MIDDLEWARES_PATH)/3rd_party/fatfs/source/ffunicode.c \
 $(MIDDLEWARES_PATH)/3rd_party/cli-simple/cli_simple.c \
@@ -76,10 +97,6 @@ $(APP_PATH)/src/flashspi.c \
 $(APP_PATH)/src/flashspi_gd25lq16.c \
 $(APP_PATH)/src/flashspi_winbond.c \
 
-#$(MIDDLEWARES_PATH)/usbd_class/msc/msc_desc.c \
-$(MIDDLEWARES_PATH)/usbd_class/msc/msc_class.c \
-$(MIDDLEWARES_PATH)/usbd_class/msc/msc_bot_scsi.c \
-#$(APP_PATH)/src/msc_diskio_sdcard.c \
 
 CPPSRCS = \
 
@@ -112,7 +129,7 @@ CPU =-mcpu=cortex-m4 -mthumb
 
 # fpu
 #at43f415 does not have FPU
-#FPU =-mfloat-abi=hard -mfpu=fpv4-sp-d16 
+#FPU =-mfloat-abi=hard -mfpu=fpv4-sp-d16
 #FPU =-mfloat-abi=soft
 
 # float-abi
@@ -135,7 +152,7 @@ endif
 
 ASFLAGS  =$(MCU) $(AS_DEFS) $(AS_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction-sections
 CFLAGS   =$(MCU) $(OPT) $(addprefix -D, $(C_DEFS)) $(addprefix -I, $(C_INCLUDES)) -std=gnu11 -fdata-sections -ffunction-sections #-fstack-usage
-CPPFLAGS =$(CPU) $(OPT) $(addprefix -D, $(C_DEFS)) $(addprefix -I, $(C_INCLUDES)) -fdata-sections -ffunction-sections -fno-unwind-tables -fno-exceptions -fno-rtti 
+CPPFLAGS =$(CPU) $(OPT) $(addprefix -D, $(C_DEFS)) $(addprefix -I, $(C_INCLUDES)) -fdata-sections -ffunction-sections -fno-unwind-tables -fno-exceptions -fno-rtti
 LDFLAGS  =$(MCU) $(SPECS) -Wl,-Map,$(BUILD_PATH)/$(TARGET).map,--cref,--gc-sections
 
 # Generate dependency information
@@ -151,7 +168,7 @@ SPECS =--specs=rdimon.specs
 LDLIBS =-nostartfiles -lc -lrdimon
 else
 SPECS=--specs=nosys.specs --specs=nano.specs
-#-nostdlib -lstd++ -lnosys -lm 
+#-nostdlib -lstd++ -lnosys -lm
 LIBS =-lstdc++
 endif
 
@@ -180,7 +197,7 @@ BIN = $(OBJCOPY) -O binary -S
 
 ifeq ($(shell uname -s), Linux)
 PRG_DEP =bin
-PRG_CFG =$(PROJECT_PATH)/$(TARGET).elf
+PRG_CFG =$(PROJECT_PATH)/at32f415.cfg
 PRG_CMD =openocd -f $(PRG_CFG) -c "program $(BUILD_PATH)/$(TARGET).elf verify reset exit"
 ERASE_CMD =openocd -f $(PRG_CFG) -c "init" -c "halt" -c "stm32f1x unlock 0" -c "stm32f1x mass_erase 0" -c "exit"
 else
@@ -196,7 +213,7 @@ endif
 #######################################
 default: spiflash
 
-sdcard: 
+sdcard:
 	@$(MAKE) $(TARGET) SD_CARD=0 SD_CARD_LUN=0 SPI_FLASH=1 SPI_FLASH_LUN=1
 	@echo "------- Build for SD card done -------"
 
@@ -208,7 +225,7 @@ $(TARGET): $(BUILD_PATH)/$(TARGET).elf
 	@echo "--- Size ---"
 	$(VERBOSE)$(SZ) -A -x $<
 	$(VERBOSE)$(SZ) -B $<
-	
+
 
 bin: $(BUILD_PATH)/$(TARGET).bin
 
@@ -251,11 +268,11 @@ $(BUILD_PATH)/$(TARGET).elf: $(BUILD_PATH) $(OBJECTS)
 
 $(BUILD_PATH)/%.hex: $(BUILD_PATH)/%.elf
 	$(VERBOSE)$(HEX) $< $@
-	
+
 $(BUILD_PATH)/%.bin: $(BUILD_PATH)/%.elf
 	$(VERBOSE)$(BIN) $< $@
-	
-$(BUILD_PATH):	
+
+$(BUILD_PATH):
 	@$(foreach obj, $(OBJECTS), mkdir -p $(dir $(obj));)
 
 #######################################

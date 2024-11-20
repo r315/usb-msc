@@ -30,8 +30,8 @@
 #include "415dk_board.h"
 #include "cli_simple.h"
 #include "ff.h"
-#include "cdc_msc_class.h"
-#include "cdc_msc_desc.h"
+#include "msc_class.h"
+#include "msc_desc.h"
 #include "msc_diskio.h"
 #include "usbd_int.h"
 #include "flashspi.h"
@@ -86,10 +86,10 @@ void usb_config(void)
   usbd_init(&otg_core_struct,
             USB_FULL_SPEED_CORE_ID,
             USB_ID,
-            //&msc_class_handler,
-            //&msc_desc_handler
-            &cdc_msc_class_handler,
-            &cdc_msc_desc_handler
+            &msc_class_handler,
+            &msc_desc_handler
+            //&cdc_msc_class_handler,
+            //&cdc_msc_desc_handler
         );
 }
 
@@ -101,7 +101,7 @@ static int listCmd(int argc, char **argv)
     uint32_t totalFiles = 0;
     uint32_t totalDirs = 0;
     DIR dir;
-    
+
     res = f_opendir(&dir, "/");
 
     if(res != FR_OK) {
@@ -110,13 +110,13 @@ static int listCmd(int argc, char **argv)
     }
 
     printf("--------\r\nRoot directory:\r\n");
-    
+
     for(;;) {
         res = f_readdir(&dir, &fileInfo);
         if((res != FR_OK) || (fileInfo.fname[0] == '\0')) {
             break;
         }
-        
+
         if(fileInfo.fattrib & AM_DIR) {
             printf("  DIR  %s\r\n", fileInfo.fname);
             totalDirs++;
@@ -139,16 +139,16 @@ static int catCmd(int argc, char **argv)
     FIL file;
     UINT br;
     char c;
-    
+
     res = f_open(&file, argv[1], FA_READ);
 
     if(res != FR_OK) {
         printf("f_open() failed, res = %d\r\n", res);
         return CLI_OK;
     }
-    
+
     do{
-        res = f_read(&file, &c, 1, &br);       
+        res = f_read(&file, &c, 1, &br);
         printf("%c", c);
     }while(res == FR_OK && br == 1);
 
@@ -164,7 +164,7 @@ static int mountCmd(int argc, char **argv)
         return CLI_BAD_PARAM;
     }
 
-	mount("0:", argv[1][0] == '1');   
+	mount("0:", argv[1][0] == '1');
     return CLI_OK;
 }
 
@@ -197,14 +197,14 @@ static int flashCmd(int argc, char **argv)
         printf("Page size: %u (0x%02X) bytes\n",  (unsigned int)fls->pagesize,  (unsigned int)fls->pagesize);
         return CLI_OK;
     }
-    
+
     if(!strcmp(argv[1], "erase")) {
         res = flashspi_erase();
         if(res != FLASHSPI_OK)
             printf("Error %d\n", res);
         return CLI_OK;
     }
-    
+
     if(!strcmp(argv[1], "fs")) {
         #if FF_USE_MKFS
         f_mkfs("0:", FM_FAT, NULL, fls->sectorsize);
@@ -255,9 +255,9 @@ cli_command_t cli_cmds [] = {
 FRESULT getDiskSize(TCHAR *path, DISK_SIZE *disk_size)
 {
 	FATFS *pfs;
-    FRESULT res;	
-	DWORD fre_clust;    
-	
+    FRESULT res;
+	DWORD fre_clust;
+
 	res = f_getfree(path, &fre_clust, &pfs);
 
 	if(res == FR_OK){
@@ -276,7 +276,7 @@ FRESULT mount(TCHAR *path, uint8_t m)
     if(m)
     {
         if(fs){
-            printf("FS already mounted\n"); 
+            printf("FS already mounted\n");
             return FR_OK;
         }
 
@@ -332,7 +332,6 @@ int main(void)
 	NVIC_SetPriorityGrouping(NVIC_PRIORITY_GROUP_4);
 
     #ifdef ENABLE_CLI
-    extern void serial_init(void);
     serial_init();
 
     CLI_Init("msd >");
@@ -346,33 +345,16 @@ int main(void)
 	usb_config();
     #endif
 
-    int i = 0;
-    uint8_t buf[64];
-    
     otg_core_struct.usb_reg = NULL;
 
 	while(1)
-	{		
-        delay_ms(100);
+	{
         #if ENABLE_CLI
         if(CLI_ReadLine()){
             CLI_HandleLine();
         }
-
-        if(otg_core_struct.usb_reg != NULL){
-            if(usb_vcp_get_rxdata(&otg_core_struct.dev, buf) > 0){
-                printf("%s",buf);
-            }
-
-            if(i % 1000 == 0){
-                usb_vcp_send_data(&otg_core_struct.dev, (uint8_t*)"Test Data\n", 10);
-            }
-            i++;
-        }
-         #else
-        //LED1_TOGGLE;
-        delay_ms(800);
         #endif
+        delay_ms(10);
 	}
 }
 

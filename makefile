@@ -34,7 +34,7 @@ $(DRIVERS_CMSIS_PATH)/core_support \
 $(MIDDLEWARES_PATH)/usb_drivers/inc \
 $(MIDDLEWARES_PATH)/usbd_class/composite_cdc_msc \
 $(MIDDLEWARES_PATH)/3rd_party/fatfs/source \
-$(MIDDLEWARES_PATH)/3rd_party/cli_simple \
+$(MIDDLEWARES_PATH)/3rd_party/cli-simple \
 project/415dk \
 #$(MIDDLEWARES_PATH)/usbd_class/msc \
 
@@ -65,8 +65,8 @@ $(MIDDLEWARES_PATH)/usbd_class/composite_cdc_msc/cdc_msc_class.c \
 $(MIDDLEWARES_PATH)/usbd_class/composite_cdc_msc/cdc_msc_bot_scsi.c \
 $(MIDDLEWARES_PATH)/3rd_party/fatfs/source/ff.c \
 $(MIDDLEWARES_PATH)/3rd_party/fatfs/source/ffunicode.c \
-$(MIDDLEWARES_PATH)/3rd_party/cli_simple/cli_simple.c \
-$(MIDDLEWARES_PATH)/3rd_party/cli_simple/syscalls.c \
+$(MIDDLEWARES_PATH)/3rd_party/cli-simple/cli_simple.c \
+$(MIDDLEWARES_PATH)/3rd_party/cli-simple/syscalls.c \
 $(APP_PATH)/src/main.c \
 $(APP_PATH)/src/ff_diskio.c \
 $(APP_PATH)/src/msc_diskio.c \

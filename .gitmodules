@@ -1,0 +1,3 @@
+[submodule "middlewares/3rd_party/cli-simple"]
+	path = middlewares/3rd_party/cli-simple
+	url = https://github.com/r315/cli-simple.git

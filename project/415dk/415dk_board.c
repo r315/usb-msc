@@ -1,6 +1,5 @@
 #include <string.h>
-#include "415dk_board.h"
-#include "at32_sdio.h"
+#include "board.h"
 #include "syscalls.h"
 
 

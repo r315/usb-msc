@@ -22,7 +22,7 @@
   **************************************************************************
   */
 #include "usbd_int.h"
-#include "415dk_board.h"
+#include "board.h"
 
 /** @addtogroup AT32F415_middlewares_usbd_drivers
   * @{

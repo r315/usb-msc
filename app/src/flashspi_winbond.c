@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include "flashspi.h"
 #include "at32_spiflash.h"
-#include "415dk_board.h"
+#include "board.h"
 
 #define W25Q64_M_ID             0xEF16
 #define W25Q64_DEV_ID           0xEF4017  // Single
@@ -83,18 +83,18 @@ static flashspi_res_t winbond_erase(void)
     return FLASHSPI_ERROR_TIMEOUT;
 }
 
-const flashspi_t w25x32 = 
+const flashspi_t w25x32 =
 {
     .name = "W25X32",
     .mid = W25X32_M_ID,
     .size = W25X32_SIZE,
     .pagesize = W25X32_PAGE_SIZE,
-    .sectorsize = W25X32_SECTOR_SIZE,  
+    .sectorsize = W25X32_SECTOR_SIZE,
     .init = w25x32_init,
     .erase = winbond_erase
 };
 
-const flashspi_t w25q64 = 
+const flashspi_t w25q64 =
 {
     .name = "W25Q64",
     .mid = W25Q64_M_ID,
@@ -105,7 +105,7 @@ const flashspi_t w25q64 =
     .erase = winbond_erase
 };
 
-const flashspi_t w25q128 = 
+const flashspi_t w25q128 =
 {
     .name = "W25Q128",
     .mid = W25Q128_M_ID,

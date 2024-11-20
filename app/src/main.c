@@ -27,7 +27,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include "415dk_board.h"
+#include "board.h"
 #include "cli_simple.h"
 #include "ff.h"
 #include "msc_class.h"

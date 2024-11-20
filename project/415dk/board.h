@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "at32f415.h"
+#include "at32_sdio.h"
 
 #define LED1_ON         GPIOA->scr = (1 << 8)
 #define LED1_OFF        GPIOA->clr = (1 << 8)
@@ -17,6 +18,8 @@ void system_tick_init(void);
 void delay_init(void);
 void delay_ms(uint32_t ms);
 uint32_t get_tick(void);
+void usb_unplug(void);
+void usb_config(void);
 void usb_clock48m_select(usb_clk48_s clk_s);
 void usb_gpio_config(void);
 void usb_gpio_deinit(void);

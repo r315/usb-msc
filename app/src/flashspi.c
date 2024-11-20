@@ -1,7 +1,7 @@
 #include <stddef.h>
 #include "flashspi.h"
 #include "at32_spiflash.h"
-#include "415dk_board.h"
+#include "board.h"
 
 #define FLASH_DEVICES_COUNT sizeof (flashspi_devices) / sizeof (flashspi_t *)
 
@@ -18,8 +18,8 @@ extern const flashspi_t w25x32;
 
 static const flashspi_t *spiflash;
 static const flashspi_t *flashspi_devices[] = {
-    &gd25lq16, 
-    &w25q64, 
+    &gd25lq16,
+    &w25q64,
     &w25q128,
     &w25x32
 };
@@ -57,7 +57,7 @@ flashspi_res_t flashspi_init (void)
 /**
  * @brief  Get current active spi flash device.
  * @param  None
- * @retval 
+ * @retval
  */
 const flashspi_t *flashspi_get (void)
 {
@@ -218,8 +218,8 @@ flashspi_res_t flashspi_write (const uint8_t *pbuffer, uint32_t writeaddr,
 
 /**
  * @brief Performs a chip erase
- * 
- * @return flashspi_res_t 
+ *
+ * @return flashspi_res_t
  */
 flashspi_res_t flashspi_erase(void)
 {

@@ -8,13 +8,16 @@ The supported devices are sdcard <4GB and spi flash.
 
 ## MMC/SD Card
 <pre>
-    sdio1                     at32f415            sd/mmc card
-  - sdio1_d0                    PA4          <-->   dat0
-  - sdio1_d1                    PA5          <-->   dat1
-  - sdio1_d2                    PA6          <-->   dat2
-  - sdio1_d3                    PA7          <-->   dat3
-  - sdio1_ck                    PA2          --->   clk
-  - sdio1_cmd                   PA3          --->   cmd
+    sdio1                     at32f415            sd/mmc card  _________
+                                                     ______/            |
+  - sdio1_d2                    PA6          <-->   |dat2/x             |
+  - sdio1_d3                    PA7          <-->   |dat3/cs            |
+  - sdio1_cmd                   PA3          --->   |cmd/di             |
+                                                    |vdd                |
+  - sdio1_ck                    PA2          --->   |clk                |
+                                                    |gnd                | 
+  - sdio1_d0                    PA4          <-->   |dat0/do            |
+  - sdio1_d1                    PA5          <-->   |dat1/x_____________|
 </pre>
 
 ## SPI Flash

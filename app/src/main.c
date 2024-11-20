@@ -30,10 +30,6 @@
 #include "board.h"
 #include "cli_simple.h"
 #include "ff.h"
-#include "msc_class.h"
-#include "msc_desc.h"
-#include "msc_diskio.h"
-#include "usbd_int.h"
 #include "flashspi.h"
 
 typedef struct
@@ -43,54 +39,19 @@ typedef struct
 }DISK_SIZE;
 
 static FATFS *fs;
-static otg_core_type otg_core_struct;
+
 
 
 FRESULT mount(TCHAR *path, uint8_t m);
 
-void usb_unplug(void)
+static void dump_buffer(uint8_t *buf, uint32_t count)
 {
-    usb_disconnect(otg_core_struct.usb_reg);
-    delay_ms(100);
-    nvic_irq_disable(OTGFS1_IRQn);
-    crm_periph_reset(CRM_OTGFS1_PERIPH_RESET, TRUE);
-    usb_gpio_deinit();
-
-    otg_core_struct.usb_reg = NULL;
-}
-
-void usb_config(void)
-{
-#ifdef USB_LOW_POWER_WAKUP
-  usb_low_power_wakeup_config();
-#endif
-
-  /* enable otgfs clock */
-  crm_periph_clock_enable(CRM_OTGFS1_PERIPH_CLOCK, TRUE);
-
-  crm_periph_reset(CRM_OTGFS1_PERIPH_RESET, TRUE);
-
-  /* select usb 48m clock source */
-  //usb_clock48m_select(USB_CLK_HICK);
-  /* Using internal oscillator */
-  crm_usb_clock_source_select(CRM_USB_CLOCK_SOURCE_HICK);
-
-  crm_periph_reset(CRM_OTGFS1_PERIPH_RESET, FALSE);
-
-  usb_gpio_config();
-
-  /* enable otgfs irq */
-  nvic_irq_enable(OTGFS1_IRQn, 0, 0);
-
-  /* init usb */
-  usbd_init(&otg_core_struct,
-            USB_FULL_SPEED_CORE_ID,
-            USB_ID,
-            &msc_class_handler,
-            &msc_desc_handler
-            //&cdc_msc_class_handler,
-            //&cdc_msc_desc_handler
-        );
+    for(int i = 0; i < count; i ++){
+        if( (i & 15) == 0)
+            printf("\n%02X: ", i & 0xF0);
+        printf("%02X ", buf[i]);
+    }
+    putchar('\n');
 }
 
 #ifdef ENABLE_CLI
@@ -338,14 +299,12 @@ int main(void)
     CLI_RegisterCommand(cli_cmds, sizeof(cli_cmds) / sizeof(cli_command_t));
     printf("\rType 'help' for available commands\n");
 
-    msc_init(0);
+    sd_init();
 
     #else
     //mount(1);
 	usb_config();
     #endif
-
-    otg_core_struct.usb_reg = NULL;
 
 	while(1)
 	{
@@ -356,15 +315,5 @@ int main(void)
         #endif
         delay_ms(10);
 	}
-}
-
-/**
-  * @brief  this function handles otgfs interrupt.
-  * @param  none
-  * @retval none
-  */
-void OTGFS1_IRQHandler(void)
-{
-  usbd_irq_handler(&otg_core_struct);
 }
 

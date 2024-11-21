@@ -382,7 +382,7 @@ usb_sts_type bot_scsi_inquiry(void *udev, uint8_t lun)
   }
   else
   {
-    pdata = get_inquiry(lun);
+    pdata = msc_get_inquiry(lun);
     if(pmsc->cbw_struct.dCBWDataTransferLength < SCSI_INQUIRY_DATA_LENGTH)
     {
       trans_len = pmsc->cbw_struct.dCBWDataTransferLength;

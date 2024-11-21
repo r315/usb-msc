@@ -98,10 +98,10 @@ usb_sts_type msc_init (uint8_t lun)
    {
       case SPI_FLASH_LUN:
          return flashspi_init ();
-         
+
       case SD_CARD_LUN:
          return sd_init ();
-      
+
       case INTERNAL_FLASH_LUN:
       default:
          break;
@@ -115,12 +115,44 @@ usb_sts_type msc_init (uint8_t lun)
  * @param  lun: logical units number
  * @retval inquiry string
  */
-uint8_t *get_inquiry (uint8_t lun)
+uint8_t *msc_get_inquiry (uint8_t lun)
 {
    if (lun < MSC_SUPPORT_MAX_LUN)
       return (uint8_t *) scsi_inquiry[lun];
    else
       return NULL;
+}
+
+/**
+ * @brief  disk capacity
+ * @param  lun: logical units number
+ * @param  blk_nbr: pointer to number of block
+ * @param  blk_size: pointer to block size
+ * @retval status of usb_sts_type
+ */
+usb_sts_type msc_disk_capacity (uint8_t lun, uint32_t *blk_nbr,
+                                uint32_t *blk_size)
+{
+   card_info_t *card_info;
+
+   switch (lun)
+   {
+      case INTERNAL_FLASH_LUN:
+         break;
+      case SPI_FLASH_LUN:
+         *blk_size = 512;
+         *blk_nbr  = flashspi_getsize () / *blk_size;
+         break;
+      case SD_CARD_LUN:
+         card_info = sd_card_info_get ();
+         *blk_size = card_info->block_size;
+         *blk_nbr  = card_info->capacity / card_info->block_size;
+         break;
+
+      default:
+         return USB_ERROR;
+   }
+   return USB_OK;
 }
 
 /**
@@ -179,35 +211,6 @@ usb_sts_type msc_disk_write (uint8_t lun, uint32_t addr, uint8_t *buf,
          break;
    }
    return res;
-}
-
-/**
- * @brief  disk capacity
- * @param  lun: logical units number
- * @param  blk_nbr: pointer to number of block
- * @param  blk_size: pointer to block size
- * @retval status of usb_sts_type
- */
-usb_sts_type msc_disk_capacity (uint8_t lun, uint32_t *blk_nbr,
-                                uint32_t *blk_size)
-{
-   switch (lun)
-   {
-      case INTERNAL_FLASH_LUN:
-         break;
-      case SPI_FLASH_LUN:
-         *blk_size = 512;
-         *blk_nbr  = flashspi_getsize () / *blk_size;
-         break;
-      case SD_CARD_LUN:
-         *blk_size = 512;
-         *blk_nbr  = sd_card_info.card_capacity / *blk_size;
-         break;
-
-      default:
-         return USB_ERROR;
-   }
-   return USB_OK;
 }
 
 /**

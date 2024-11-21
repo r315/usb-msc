@@ -51,14 +51,14 @@ DSTATUS disk_initialize (
          if ((DRESULT) sd_init () == RES_OK)
          {
             status &= ~STA_NOINIT;
-         }         
+         }
          break;
 
       case SPI_FLASH:
          if ((DRESULT) flashspi_init () == RES_OK)
          {
             status &= ~STA_NOINIT;
-         }         
+         }
          break;
 
       default:
@@ -85,7 +85,7 @@ DRESULT disk_read (BYTE pdrv,  /* Physical drive nmuber to identify the drive */
       case SD_CARD:
          status = (DRESULT) sd_read_disk (buff, sector, count);
          break;
-      
+
       case SPI_FLASH:
          status = (DRESULT) flashspi_read (buff, sector * 512, count * 512);
          break;
@@ -145,28 +145,31 @@ DRESULT disk_ioctl (BYTE pdrv, /* Physical drive nmuber (0..) */
 )
 {
    DRESULT status = RES_PARERR;
+   card_info_t *card_info;
+
 
    if (status & STA_NOINIT)
       return RES_NOTRDY;
 
    switch (pdrv)
    {
-      case SD_CARD:         
+      case SD_CARD:
+         card_info = sd_card_info_get ();
          switch (cmd)
          {
             case CTRL_SYNC:
                status = RES_OK;
                break;
             case GET_SECTOR_SIZE:
-               *(DWORD *) buff = 512;
+               *(DWORD *) buff = card_info->block_size;
                status          = RES_OK;
                break;
             case GET_SECTOR_COUNT:
-               *(DWORD *) buff = sd_card_info.card_capacity / 512;
+               *(DWORD *) buff = card_info->capacity / card_info->block_size;
                status          = RES_OK;
                break;
             case GET_BLOCK_SIZE:
-               *(DWORD *) buff = sd_card_info.card_blk_size;
+               *(DWORD *) buff = card_info->block_size;
                status          = RES_OK;
                break;
             default:
@@ -174,7 +177,7 @@ DRESULT disk_ioctl (BYTE pdrv, /* Physical drive nmuber (0..) */
                break;
          }
          break;
-      
+
       case SPI_FLASH:
          switch (cmd)
          {

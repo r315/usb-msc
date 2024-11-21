@@ -48,13 +48,134 @@ static void dump_buffer(uint8_t *buf, uint32_t count)
 {
     for(int i = 0; i < count; i ++){
         if( (i & 15) == 0)
-            printf("\n%02X: ", i & 0xF0);
+            printf("\n%04X: ", i);
         printf("%02X ", buf[i]);
     }
     putchar('\n');
 }
 
 #ifdef ENABLE_CLI
+static int sdCardCmd(int argc, char **argv)
+{
+    const char *card_types[] = {
+        "STD_CAPACITY_SD_CARD_V1_1",
+        "STD_CAPACITY_SD_CARD_V2_0",
+        "HIGH_CAPACITY_SD_CARD",
+        "MULTIMEDIA_CARD",
+        "SECURE_DIGITAL_IO_CARD",
+        "HIGH_SPEED_MULTIMEDIA_CARD",
+        "SECURE_DIGITAL_IO_COMBO_CARD",
+        "HIGH_CAPACITY_MMC_CARD",
+        "SDIO_CARD"
+    };
+
+    const char *sd_errors[] = {
+        "SD_OK" ,
+        "SD_CMD_FAIL" ,
+        "SD_DATA_FAIL" ,
+        "SD_CMD_RSP_TIMEOUT" ,
+        "SD_DATA_TIMEOUT" ,
+        "SD_TX_UNDERRUN" ,
+        "SD_RX_OVERRUN" ,
+        "SD_START_BIT_ERR" ,
+        "SD_CMD_OUT_OF_RANGE" ,
+        "SD_ADDR_MISALIGNED" ,
+        "SD_BLK_LEN_ERR" ,
+        "SD_ERASE_SEQ_ERR" ,
+        "SD_INVALID_ERASE_PARAM" ,
+        "SD_WR_PROTECT_VIOLATION" ,
+        "SD_LOCK_UNLOCK_ERROR" ,
+        "SD_CMD_CRC_ERROR" ,
+        "SD_ILLEGAL_CMD" ,
+        "SD_CARD_ECC_ERROR" ,
+        "SD_CARD_CONTROLLER_ERR" ,
+        "SD_GENERAL_UNKNOWN_ERROR" ,
+        "SD_STREAM_RD_UNDERRUN" ,
+        "SD_STREAM_WR_OVERRUN" ,
+        "SD_CID_CSD_OVERWRITE" ,
+        "SD_WP_ERASE_SKIP" ,
+        "SD_CARD_ECC_DISABLED" ,
+        "SD_ERASE_RESET" ,
+        "SD_AKE_SEQ_ERROR" ,
+        "SD_INVALID_VOLTRANGE" ,
+        "SD_ADDR_OUT_OF_RANGE" ,
+        "SD_SWITCH_ERROR" ,
+        "SD_SDIO_DISABLED" ,
+        "SD_SDIO_FUNC_BUSY" ,
+        "SD_SDIO_FUNC_ERROR" ,
+        "SD_SDIO_UNKNOWN_FUNC" ,
+        "SD_INTERNAL_ERROR" ,
+        "SD_NOT_CONFIGURED" ,
+        "SD_REQ_PENDING" ,
+        "SD_REQ_NOT_APPLICABLE" ,
+        "SD_INVALID_PARAMETER" ,
+        "SD_UNSUPPORTED_FEATURE" ,
+        "SD_UNSUPPORTED_HW" ,
+        "SD_ERROR"
+    };
+
+    card_info_t *sd_card_info;
+
+    sd_card_info = sd_card_info_get ();
+
+    if(!strcmp(argv[1], "init")) {
+        printf("SD Card Init: %s\n", sd_errors[(uint8_t)sd_init ()]);
+        return CLI_OK;
+    }
+
+    if(!strcmp(argv[1], "info")) {
+        printf("\tType: %s\n", card_types[sd_card_info->type]);
+        printf("\tCapacity: %llu bytes\n", sd_card_info->capacity);
+        printf("\tBlock size: %lu bytes\n", sd_card_info->block_size);
+        printf("\tRelative card address (RCA): %u\n", sd_card_info->rca);
+        /* SCR */
+        printf("\tSCR\n");
+        printf("\t\tSCR Structure: %u\n", sd_card_info->scr.scr_structure);
+        printf("\t\tSD Spec: %u\n", sd_card_info->scr.sd_spec);
+        printf("\t\tDATA After erase: %u\n", sd_card_info->scr.data_stat_after_erase);
+        printf("\t\tSD Security: %u\n", sd_card_info->scr.sd_security);
+        printf("\t\tBUS Widths: %u\n", sd_card_info->scr.sd_bus_widths);
+        printf("\t\tV3 Spec: %u\n", sd_card_info->scr.sd_spec3);
+        printf("\t\tEX Security: %u\n", sd_card_info->scr.ex_security);
+        printf("\t\tV4 Spec: %u\n", sd_card_info->scr.sd_spec4);
+        printf("\t\tVX Spec: %u\n", sd_card_info->scr.sd_specx);
+        printf("\t\tCMD Support : %u\n", sd_card_info->scr.cmd_support);
+
+        printf("\tCSD\n");
+        printf("\t\tCSD Structure: %u\n", sd_card_info->csd.csd_struct);
+        printf("\t\tWR Protection: %u\n", sd_card_info->csd.permanent_write_protect);
+
+        return CLI_OK;
+    }
+
+    if(!strcmp(argv[1], "rb")) {
+        uint8_t buffer[512]; // sd_card_info->card_blk_size];
+        uint32_t address;
+        if(CLI_Ha2i(argv[2], &address)){
+            sdio_error_t res = sd_block_read(buffer, address << 9, sizeof(buffer));
+            if(res == SD_OK){
+                dump_buffer(buffer, sizeof(buffer));
+            }else{
+                printf("\tType: %s\n", sd_errors[res]);
+            }
+            return CLI_OK;
+        }
+    }
+
+    if(!strcmp(argv[1], "eb")) {
+        uint32_t address;
+        if(CLI_Ha2i(argv[2], &address)){
+            sdio_error_t res = sd_block_erase(address << 9, 1);
+            if(res != SD_OK){
+                printf("\tFail: %s\n", sd_errors[res]);
+            }
+            return CLI_OK;
+        }
+    }
+
+    return CLI_BAD_PARAM;
+}
+
 static int listCmd(int argc, char **argv)
 {
     FRESULT res;
@@ -210,6 +331,7 @@ cli_command_t cli_cmds [] = {
     {"list", listCmd},
     {"cat", catCmd},
     {"flash", flashCmd},
+    {"sd", sdCardCmd},
 };
 #endif
 

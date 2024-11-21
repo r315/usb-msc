@@ -167,7 +167,7 @@ ifdef SEMIHOSTING
 SPECS =--specs=rdimon.specs
 LDLIBS =-nostartfiles -lc -lrdimon
 else
-SPECS=--specs=nosys.specs --specs=nano.specs
+#SPECS=--specs=nosys.specs --specs=nano.specs
 #-nostdlib -lstd++ -lnosys -lm
 LIBS =-lstdc++
 endif
@@ -211,7 +211,7 @@ endif
 #######################################
 # Rules
 #######################################
-default: spiflash
+default: sdcard
 
 sdcard:
 	@$(MAKE) $(TARGET) SD_CARD=0 SD_CARD_LUN=0 SPI_FLASH=1 SPI_FLASH_LUN=1

@@ -40,7 +40,11 @@ typedef struct
 
 static FATFS *fs;
 
-
+static stdinout_t serial_ops = {
+    .available = (int (*)(void))serial_available,
+    .read = (int (*)(char*, int))serial_read,
+    .write = (int (*)(const char*, int))serial_write
+};
 
 FRESULT mount(TCHAR *path, uint8_t m);
 
@@ -417,7 +421,7 @@ int main(void)
     #ifdef ENABLE_CLI
     serial_init();
 
-    CLI_Init("msd >");
+    CLI_Init("msd >", &serial_ops);
     CLI_RegisterCommand(cli_cmds, sizeof(cli_cmds) / sizeof(cli_command_t));
     printf("\rType 'help' for available commands\n");
 
@@ -437,5 +441,13 @@ int main(void)
         #endif
         delay_ms(10);
 	}
+}
+
+int _write(int file, char *ptr, int len)
+{
+    if(file == 1){
+        return serial_write((uint8_t *)ptr, len);
+    }
+	return 0;
 }
 

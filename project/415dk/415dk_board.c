@@ -1,18 +1,10 @@
 #include <string.h>
 #include "board.h"
-#include "syscalls.h"
 #include "msc_class.h"
 #include "msc_desc.h"
 #include "msc_diskio.h"
 #include "usbd_int.h"
 
-
-static stdout_ops_t stdout_ops_serial = {
-    .init = serial_init,
-    .available = serial_available,
-    .read = serial_read,
-    .write = serial_write
-};
 
 static otg_core_type otg_core_struct;
 static volatile uint32_t ticms;
@@ -50,10 +42,7 @@ void board_init(void)
     SystemInit();
     system_core_clock_update();
     system_tick_init();
-
-    redirect_stdout(&stdout_ops_serial);
     LED1_INIT;
-
     otg_core_struct.usb_reg = NULL;
 }
 

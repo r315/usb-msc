@@ -18,6 +18,7 @@
 #include "cdc_msc_class.h"
 #include "flashspi.h"
 #include "msc_diskio.h"
+
 #define PRINT_DISKIO_DBG 0
 #if PRINT_DISKIO_DBG && ENABLE_DBG_LOG
    #include "board.h"

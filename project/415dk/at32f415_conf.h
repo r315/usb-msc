@@ -136,6 +136,8 @@ extern "C" {
 #include "at32f415_usb.h"
 #endif
 
+#define DUMMY_NOP()
+
 #ifdef __cplusplus
 }
 #endif

@@ -3,7 +3,8 @@
   * @file     at32f415_i2c.h
   * @brief    at32f415 i2c header file
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -378,6 +379,7 @@ void i2c_7bit_address_send(i2c_type *i2c_x, uint8_t address, i2c_direction_type 
 void i2c_data_send(i2c_type *i2c_x, uint8_t data);
 uint8_t i2c_data_receive(i2c_type *i2c_x);
 flag_status i2c_flag_get(i2c_type *i2c_x, uint32_t flag);
+flag_status i2c_interrupt_flag_get(i2c_type *i2c_x, uint32_t flag);
 void i2c_flag_clear(i2c_type *i2c_x, uint32_t flag);
 
 /**

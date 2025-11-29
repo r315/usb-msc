@@ -3,7 +3,8 @@
   * @file     msc_bot_scsi.c
   * @brief    usb mass storage bulk-only transport and scsi command
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -382,7 +383,7 @@ usb_sts_type bot_scsi_inquiry(void *udev, uint8_t lun)
   }
   else
   {
-    pdata = msc_get_inquiry(lun);
+    pdata = get_inquiry(lun);
     if(pmsc->cbw_struct.dCBWDataTransferLength < SCSI_INQUIRY_DATA_LENGTH)
     {
       trans_len = pmsc->cbw_struct.dCBWDataTransferLength;

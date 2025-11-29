@@ -3,7 +3,8 @@
   * @file     cdc_msc_class.c
   * @brief    usb cdc class type
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to 
   * download from Artery official website is the copyrighted work of Artery. 
@@ -65,7 +66,7 @@ linecoding_type linecoding =
 };
 
 /* cdc data struct */
-static cdc_msc_struct_type cdc_msc_struct;
+cdc_msc_struct_type cdc_msc_struct;
 
 /* usb device class handler */
 usbd_class_handler cdc_msc_class_handler = 
@@ -490,15 +491,13 @@ uint16_t usb_vcp_get_rxdata(void *udev, uint8_t *recv_data)
   uint16_t tmp_len = 0;
   usbd_core_type *pudev = (usbd_core_type *)udev;
   cdc_msc_struct_type *pcdc = (cdc_msc_struct_type *)pudev->class_handler->pdata;
-
-  if(pcdc->g_rx_completed == 0)
+  
+ if(pcdc->g_rx_completed == 0)
   {
     return 0;
   }
-
   pcdc->g_rx_completed = 0;
   tmp_len = pcdc->g_rxlen;
-  
   for(i_index = 0; i_index < pcdc->g_rxlen; i_index ++)
   {
     recv_data[i_index] = pcdc->g_rx_buff[i_index];
@@ -521,7 +520,6 @@ error_status usb_vcp_send_data(void *udev, uint8_t *send_data, uint16_t len)
   error_status status = SUCCESS;
   usbd_core_type *pudev = (usbd_core_type *)udev;
   cdc_msc_struct_type *pcdc = (cdc_msc_struct_type *)pudev->class_handler->pdata;
-
   if(pcdc->g_tx_completed)
   {
     pcdc->g_tx_completed = 0;
@@ -531,7 +529,6 @@ error_status usb_vcp_send_data(void *udev, uint8_t *send_data, uint16_t len)
   {
     status = ERROR;
   }
-
   return status;
 }
 

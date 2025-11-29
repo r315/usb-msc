@@ -3,7 +3,8 @@
   * @file     usbh_cdc_class.h
   * @brief    usb host cdc class header file
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -259,8 +260,8 @@ extern usbh_class_handler_type uhost_cdc_class_handler;
 extern usbh_cdc_type usbh_cdc;
 void cdc_start_transmission(usbh_core_type *phost, uint8_t *data, uint32_t len);
 void cdc_start_reception(usbh_core_type *uhost, uint8_t *data, uint32_t len);
-__weak void cdc_transmit_complete(usbh_core_type *uhost);
-__weak void cdc_receive_complete(usbh_core_type *uhost);
+void cdc_transmit_complete(usbh_core_type *uhost);
+void cdc_receive_complete(usbh_core_type *uhost);
 /**
   * @}
   */

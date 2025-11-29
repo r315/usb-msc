@@ -3,7 +3,8 @@
   * @file     at32f415_dma.h
   * @brief    at32f415 dma header file
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -207,7 +208,8 @@ typedef enum
 {
   DMA_DIR_PERIPHERAL_TO_MEMORY           = 0x0000, /*!< dma data transfer direction:peripheral to memory */
   DMA_DIR_MEMORY_TO_PERIPHERAL           = 0x0010, /*!< dma data transfer direction:memory to peripheral */
-  DMA_DIR_MEMORY_TO_MEMORY               = 0x4000  /*!< dma data transfer direction:memory to memory */
+  DMA_DIR_MEMORY_TO_MEMORY               = 0x4000  /*!< dma data transfer direction:memory to memory,
+                                                        note:if the direction is memory to memory,peripheral_base_addr as source and memory_base_addr as destnation */
 } dma_dir_type;
 
 /**
@@ -498,6 +500,7 @@ void dma_data_number_set(dma_channel_type* dmax_channely, uint16_t data_number);
 uint16_t dma_data_number_get(dma_channel_type* dmax_channely);
 void dma_interrupt_enable(dma_channel_type* dmax_channely, uint32_t dma_int, confirm_state new_state);
 flag_status dma_flag_get(uint32_t dmax_flag);
+flag_status dma_interrupt_flag_get(uint32_t dmax_flag);
 void dma_flag_clear(uint32_t dmax_flag);
 
 

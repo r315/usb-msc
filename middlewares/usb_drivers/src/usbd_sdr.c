@@ -3,7 +3,8 @@
   * @file     usbd_sdr.c
   * @brief    usb standard device request
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -335,7 +336,7 @@ static usb_sts_type usbd_set_configuration(usbd_core_type *udev)
           udev->class_handler->clear_handler(udev);
           usbd_ctrl_send_status(udev);
         }
-        else if(config_value == udev->dev_config)
+        else if(config_value != udev->dev_config)
         {
           udev->class_handler->clear_handler(udev);
           udev->dev_config = config_value;

@@ -3,7 +3,8 @@
   * @file     at32f415_usart.c
   * @brief    contains all the functions for the usart firmware library
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -90,7 +91,7 @@ void usart_reset(usart_type* usart_x)
   *         this parameter can be one of the following values:
   *         - USART_DATA_8BITS
   *         - USART_DATA_9BITS.
-  *         note：
+  *         note:
   *         - when parity check is disabled, the data bit width is the actual data bit number.
   *         - when parity check is enabled, the data bit width is the actual data bit number minus 1, and the MSB bit is replaced with the parity bit.
   * @param  stop_bit: stop bits transmitted
@@ -574,6 +575,79 @@ flag_status usart_flag_get(usart_type* usart_x, uint32_t flag)
 }
 
 /**
+  * @brief  check whether the specified usart interrupt flag is set or not.
+  * @param  usart_x: select the usart or the uart peripheral.
+  *         this parameter can be one of the following values:
+  *         USART1, USART2, USART3, UART4 or UART5.
+  * @param  flag: specifies the flag to check.
+  *         this parameter can be one of the following values:
+  *         - USART_CTSCF_FLAG: cts change flag (not available for UART4,UART5)
+  *         - USART_BFF_FLAG:   break frame flag
+  *         - USART_TDBE_FLAG:  transmit data buffer empty flag
+  *         - USART_TDC_FLAG:   transmit data complete flag
+  *         - USART_RDBF_FLAG:  receive data buffer full flag
+  *         - USART_IDLEF_FLAG: idle flag
+  *         - USART_ROERR_FLAG: receiver overflow error flag
+  *         - USART_NERR_FLAG:  noise error flag
+  *         - USART_FERR_FLAG:  framing error flag
+  *         - USART_PERR_FLAG:  parity error flag
+  * @retval the new state of usart_flag (SET or RESET).
+  */
+flag_status usart_interrupt_flag_get(usart_type* usart_x, uint32_t flag)
+{
+  flag_status int_status = RESET;
+
+  switch(flag)
+  {
+    case USART_CTSCF_FLAG:
+      int_status = (flag_status)usart_x->ctrl3_bit.ctscfien;
+      break;
+    case USART_BFF_FLAG:
+      int_status = (flag_status)usart_x->ctrl2_bit.bfien;
+      break;
+    case USART_TDBE_FLAG:
+      int_status = (flag_status)usart_x->ctrl1_bit.tdbeien;
+      break;
+    case USART_TDC_FLAG:
+      int_status = (flag_status)usart_x->ctrl1_bit.tdcien;
+      break;
+    case USART_RDBF_FLAG:
+      int_status = (flag_status)usart_x->ctrl1_bit.rdbfien;
+      break;
+    case USART_ROERR_FLAG:
+      int_status = (flag_status)(usart_x->ctrl1_bit.rdbfien || usart_x->ctrl3_bit.errien);
+      break;
+    case USART_IDLEF_FLAG:
+      int_status = (flag_status)usart_x->ctrl1_bit.idleien;
+      break;  
+    case USART_NERR_FLAG:
+    case USART_FERR_FLAG:
+      int_status = (flag_status)usart_x->ctrl3_bit.errien;
+      break;
+    case USART_PERR_FLAG:
+      int_status = (flag_status)usart_x->ctrl1_bit.perrien;
+      break;      
+    default:
+      int_status = RESET;
+      break;
+  }
+
+  if(int_status != SET)
+  {
+    return RESET;
+  }
+
+  if(usart_x->sts & flag)
+  {
+    return SET;
+  }
+  else
+  {
+    return RESET;
+  }
+}
+
+/**
   * @brief  clear the usart's pending flags.
   * @param  usart_x: select the usart or the uart peripheral.
   *         this parameter can be one of the following values:
@@ -593,7 +667,6 @@ flag_status usart_flag_get(usart_type* usart_x, uint32_t flag)
   *         - USART_PERR_FLAG, USART_FERR_FLAG, USART_NERR_FLAG, USART_ROERR_FLAG and USART_IDLEF_FLAG are cleared by software
   *           sequence: a read operation to usart sts register (usart_flag_get())
   *           followed by a read operation to usart dt register (usart_data_receive()).
-  *         - USART_RDBF_FLAG can be also cleared by a read to the usart dt register(usart_data_receive()).
   *         - USART_TDC_FLAG can be also cleared by software sequence: a read operation to usart sts register (usart_flag_get())
   *           followed by a write operation to usart dt register (usart_data_transmit()).
   *         - USART_TDBE_FLAG is cleared only by a write to the usart dt register(usart_data_transmit()).
@@ -601,7 +674,7 @@ flag_status usart_flag_get(usart_type* usart_x, uint32_t flag)
   */
 void usart_flag_clear(usart_type* usart_x, uint32_t flag)
 {
-  if(flag & (USART_PERR_FLAG | USART_FERR_FLAG | USART_NERR_FLAG | USART_ROERR_FLAG | USART_IDLEF_FLAG))
+  if(flag & (USART_PERR_FLAG | USART_FERR_FLAG | USART_NERR_FLAG | USART_ROERR_FLAG | USART_IDLEF_FLAG | USART_RDBF_FLAG))
   {
     UNUSED(usart_x->sts);
     UNUSED(usart_x->dt);

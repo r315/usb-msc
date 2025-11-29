@@ -3,7 +3,8 @@
   * @file     at32f415_cmp.h
   * @brief    at32f415 cmp header file
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -78,6 +79,9 @@ typedef enum
   CMP_SPEED_SLOW                         = 0x01, /*!< comparator selected slow speed */
 } cmp_speed_type;
 
+#define  CMP_OUTPUT_TMR1CXORAW_OFF       CMP_OUTPUT_TMR1CHCLR
+#define  CMP_OUTPUT_TMR2CXORAW_OFF       CMP_OUTPUT_TMR2CHCLR
+#define  CMP_OUTPUT_TMR3CXORAW_OFF       CMP_OUTPUT_TMR3CHCLR
 /**
   * @brief cmp output type
   */

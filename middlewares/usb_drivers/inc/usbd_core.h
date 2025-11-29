@@ -3,7 +3,8 @@
   * @file     usbd_core.h
   * @brief    usb device core header file
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -136,8 +137,8 @@ typedef struct
 
   uint8_t                                device_addr;                /*!< device address */
   uint8_t                                remote_wakup;               /*!< remote wakeup state */
-  uint8_t                                default_config;             /*!< usb default config state */
-  uint8_t                                dev_config;                 /*!< usb device config state */
+  uint32_t                               default_config;             /*!< usb default config state */
+  uint32_t                               dev_config;                 /*!< usb device config state */
   uint32_t                               config_status;              /*!< usb configure status */
 }usbd_core_type;
 
@@ -152,6 +153,7 @@ void usbd_ctrl_recv_status(usbd_core_type *udev);
 void usbd_set_stall(usbd_core_type *udev, uint8_t ept_addr);
 void usbd_clear_stall(usbd_core_type *udev, uint8_t ept_addr);
 void usbd_ept_open(usbd_core_type *udev, uint8_t ept_addr, uint8_t ept_type, uint16_t maxpacket);
+void usbd_ept_in_check_fifo(usbd_core_type *udev, uint8_t ept_addr);
 void usbd_ept_close(usbd_core_type *udev, uint8_t ept_addr);
 void usbd_ept_send(usbd_core_type *udev, uint8_t ept_num, uint8_t *buffer, uint16_t len);
 void usbd_ept_recv(usbd_core_type *udev, uint8_t ept_num, uint8_t *buffer, uint16_t len);

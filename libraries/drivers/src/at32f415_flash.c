@@ -3,7 +3,8 @@
   * @file     at32f415_flash.c
   * @brief    contains all the functions for the flash firmware library
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -362,7 +363,7 @@ flash_status_type flash_user_system_data_program(uint32_t address, uint8_t data)
 
 /**
   * @brief  config erase/program protection for the desired sectors.
-  * @param  sector_bits:
+  * @param  sector_bits(1:ENABLE, 0:DISABLE)
   *         the pointer of the address of the sectors to be erase/program protected.
   *         the first 31 bits general every bit is used to protect 2 sectors. the bit
   *         31 is used to protect the rest sectors and extension memory.

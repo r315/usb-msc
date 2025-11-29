@@ -3,7 +3,8 @@
   * @file     usbd_int.c
   * @brief    usb interrupt request
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -22,7 +23,6 @@
   **************************************************************************
   */
 #include "usbd_int.h"
-#include "board.h"
 
 /** @addtogroup AT32F415_middlewares_usbd_drivers
   * @{
@@ -430,8 +430,12 @@ void usbd_reset_handler(usbd_core_type *udev)
   /* clear in and out endpoint interrupt flag */
   for(i_index = 0; i_index < USB_EPT_MAX_NUM; i_index ++)
   {
-    USB_INEPT(usbx, i_index)->diepint = 0xFF;
-    USB_OUTEPT(usbx, i_index)->doepint = 0xFF;
+    USB_INEPT(usbx, i_index)->diepint = 0xFFFF;
+    USB_INEPT(usbx, i_index)->diepctl_bit.stall = FALSE;
+    USB_INEPT(usbx, i_index)->diepctl_bit.snak = TRUE;
+    USB_OUTEPT(usbx, i_index)->doepint = 0xFFFF;
+    USB_OUTEPT(usbx, i_index)->doepctl_bit.stall = FALSE;
+    USB_OUTEPT(usbx, i_index)->doepctl_bit.snak = TRUE;
   }
 
   /* clear endpoint flag */

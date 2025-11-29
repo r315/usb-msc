@@ -3,7 +3,8 @@
   * @file     at32f415_crm.c
   * @brief    contains all the functions for the crm firmware library
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -131,6 +132,64 @@ flag_status crm_flag_get(uint32_t flag)
   {
     status = SET;
   }
+  return status;
+}
+
+/**
+  * @brief  get crm interrupt flag status
+  * @param  flag
+  *         this parameter can be one of the following values:
+  *         - CRM_LICK_READY_INT_FLAG
+  *         - CRM_LEXT_READY_INT_FLAG
+  *         - CRM_HICK_READY_INT_FLAG
+  *         - CRM_HEXT_READY_INT_FLAG
+  *         - CRM_PLL_READY_INT_FLAG
+  *         - CRM_CLOCK_FAILURE_INT_FLAG
+  * @retval flag_status (SET or RESET)
+  */
+flag_status crm_interrupt_flag_get(uint32_t flag)
+{
+  flag_status status = RESET;
+  switch(flag)
+  {
+    case CRM_LICK_READY_INT_FLAG:
+      if(CRM->clkint_bit.lickstblf && CRM->clkint_bit.lickstblien)
+      {
+        status = SET;
+      }
+      break;
+    case CRM_LEXT_READY_INT_FLAG:
+      if(CRM->clkint_bit.lextstblf && CRM->clkint_bit.lextstblien)
+      {
+        status = SET;
+      }
+      break;
+    case CRM_HICK_READY_INT_FLAG:
+      if(CRM->clkint_bit.hickstblf && CRM->clkint_bit.hickstblien)
+      {
+        status = SET;
+      }
+      break;
+    case CRM_HEXT_READY_INT_FLAG:
+      if(CRM->clkint_bit.hextstblf && CRM->clkint_bit.hextstblien)
+      {
+        status = SET;
+      }
+      break;
+    case CRM_PLL_READY_INT_FLAG:
+      if(CRM->clkint_bit.pllstblf && CRM->clkint_bit.pllstblien)
+      {
+        status = SET;
+      }
+      break;
+    case CRM_CLOCK_FAILURE_INT_FLAG:
+      if(CRM->clkint_bit.cfdf && CRM->ctrl_bit.cfden)
+      {
+        status = SET;
+      }
+      break;
+  }
+
   return status;
 }
 
@@ -646,6 +705,7 @@ void crm_pll_config2(crm_pll_clock_source_type clock_source, uint16_t pll_ns, \
 void crm_sysclk_switch(crm_sclk_type value)
 {
   CRM->cfg_bit.sclksel = value;
+  DUMMY_NOP();
 }
 
 /**
@@ -704,14 +764,14 @@ void crm_clocks_freq_get(crm_clocks_freq_type *clocks_struct)
         /* process high bits */
         if((pll_mult_h != 0U) || (pll_mult == 15U))
         {
-            pll_mult += ((16U * pll_mult_h) + 1U);
+          pll_mult += ((16U * pll_mult_h) + 1U);
         }
         else
         {
-            pll_mult += 2U;
+          pll_mult += 2U;
         }
 
-        if (pll_clock_source == 0x00)
+        if(pll_clock_source == 0x00)
         {
           /* hick divided by 2 selected as pll clock entry */
           clocks_struct->sclk_freq = (HICK_VALUE >> 1) * pll_mult;
@@ -719,7 +779,7 @@ void crm_clocks_freq_get(crm_clocks_freq_type *clocks_struct)
         else
         {
           /* hext selected as pll clock entry */
-          if (CRM->cfg_bit.pllhextdiv != RESET)
+          if(CRM->cfg_bit.pllhextdiv != RESET)
           {
             /* hext clock divided by 2 */
             clocks_struct->sclk_freq = (HEXT_VALUE / 2) * pll_mult;
@@ -736,7 +796,7 @@ void crm_clocks_freq_get(crm_clocks_freq_type *clocks_struct)
         pll_ns = CRM->pll_bit.pllns;
         pll_fr = CRM->pll_bit.pllfr;
 
-        if (pll_clock_source == 0x00)
+        if(pll_clock_source == 0x00)
         {
           /* hick divided by 2 selected as pll clock entry */
           pllrcsfreq = (HICK_VALUE >> 1);
@@ -744,7 +804,7 @@ void crm_clocks_freq_get(crm_clocks_freq_type *clocks_struct)
         else
         {
           /* hext selected as pll clock entry */
-          if (CRM->cfg_bit.pllhextdiv != RESET)
+          if(CRM->cfg_bit.pllhextdiv != RESET)
           {
             /* hext clock divided by 2 */
             pllrcsfreq = (HEXT_VALUE / 2);

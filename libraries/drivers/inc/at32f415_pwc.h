@@ -3,7 +3,8 @@
   * @file     at32f415_pwc.h
   * @brief    at32f415 pwc header file
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -58,7 +59,7 @@ extern "C" {
 /**
   * @brief pwc wakeup pin num definition
   */
-#define PWC_WAKEUP_PIN_1                 ((uint32_t)0x00000100) /*!< standby wake-up pin1 */
+#define PWC_WAKEUP_PIN_1                 ((uint32_t)0x00000100) /*!< standby wake-up pin1(pa0) */
 
 /** @defgroup PWC_exported_types
   * @{

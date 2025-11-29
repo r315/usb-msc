@@ -3,7 +3,8 @@
   * @file     usbd_core.c
   * @brief    usb device driver
   **************************************************************************
-  *                       Copyright notice & Disclaimer
+  *
+  * Copyright (c) 2025, Artery Technology, All rights reserved.
   *
   * The software Board Support Package (BSP) that is made available to
   * download from Artery official website is the copyrighted work of Artery.
@@ -160,6 +161,7 @@ void usbd_core_setup_handler(usbd_core_type *udev, uint8_t ept_num)
       usbd_endpoint_request(udev);
       break;
     default:
+      usbd_ctrl_unsupport(udev);
       break;
   }
 }
@@ -336,6 +338,28 @@ void usbd_ept_open(usbd_core_type *udev, uint8_t ept_addr, uint8_t ept_type, uin
 }
 
 /**
+  * @brief  usb check fifo
+  * @param  udev: to the structure of usbd_core_type
+  * @param  ept_addr: endpoint number
+  * @retval none
+  */
+void usbd_ept_in_check_fifo(usbd_core_type *udev, uint8_t ept_addr)
+{
+  otg_global_type *usbx = udev->usb_reg;
+  uint32_t timeout = 0xFFFF;
+  uint8_t endp = ept_addr & 0x7F;
+  if(USB_INEPT(usbx, endp)->diepctl_bit.eptena == SET && 
+    USB_INEPT(usbx, endp)->diepctl_bit.usbacept == SET)
+  {
+    USB_INEPT(usbx, endp)->diepctl_bit.snak = TRUE;
+    USB_INEPT(usbx, endp)->diepctl_bit.eptdis = TRUE;
+    USB_INEPT(usbx, endp)->diepctl_bit.snak = TRUE;
+    while(USB_INEPT(usbx, endp)->diepctl_bit.eptdis && timeout --);
+    usbd_flush_tx_fifo(udev, endp);
+  }
+}
+
+/**
   * @brief  usb close endpoint
   * @param  udev: to the structure of usbd_core_type
   * @param  ept_addr: endpoint number
@@ -437,7 +461,10 @@ void usbd_ept_send(usbd_core_type *udev, uint8_t ept_addr, uint8_t *buffer, uint
   otg_eptin_type *ept_in = USB_INEPT(usbx, ept_info->eptn);
   otg_device_type *dev = OTG_DEVICE(usbx);
   uint32_t pktcnt;
-
+  
+  /* check endpoint fifo */
+  usbd_ept_in_check_fifo(udev, ept_addr);
+  
   /* set send data buffer and length */
   ept_info->trans_buf = buffer;
   ept_info->total_len = len;
@@ -853,9 +880,8 @@ usb_sts_type usbd_core_init(usbd_core_type *udev,
                   USB_OTG_USBSUSP_INT | USB_OTG_USBRST_INT |
                   USB_OTG_ENUMDONE_INT | USB_OTG_IEPT_INT |
                   USB_OTG_OEPT_INT | USB_OTG_INCOMISOIN_INT |
-                  USB_OTG_INCOMPIP_INCOMPISOOUT_INT | USB_OTG_WKUP_INT
-                  //| USB_OTG_OTGINT_INT
-                  ;
+                  USB_OTG_INCOMPIP_INCOMPISOOUT_INT | USB_OTG_WKUP_INT |
+                  USB_OTG_OTGINT_INT;
 
   /* usb connect */
   usbd_connect(udev);

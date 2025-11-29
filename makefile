@@ -15,7 +15,7 @@ ENABLE_CLI
 #######################################
 BUILD_DIR 		:=build
 PROJECT_PATH 	=.$(CWD)
-
+TARGET_PATH		=$(PROJECT_PATH)/project/415dk
 APP_PATH           =app
 DRIVERS_PER_PATH   =libraries/drivers
 DRIVERS_CMSIS_PATH =libraries/cmsis/cm4
@@ -36,7 +36,7 @@ $(MIDDLEWARES_PATH)/usbd_class/composite_cdc_msc \
 $(MIDDLEWARES_PATH)/usbd_class/msc \
 $(MIDDLEWARES_PATH)/3rd_party/fatfs/source \
 $(MIDDLEWARES_PATH)/3rd_party/cli-simple \
-project/415dk \
+$(TARGET_PATH) \
 #$(MIDDLEWARES_PATH)/usbd_class/msc \
 
 AS_INCLUDES =\
@@ -45,7 +45,7 @@ AS_INCLUDES =\
 # Sources
 ######################################
 
-CSRCS_PERIPHERALS =\
+TARGET_DRV_PER =\
 $(DRIVERS_PER_PATH)/src/at32f415_usb.c \
 $(DRIVERS_PER_PATH)/src/at32f415_crm.c \
 $(DRIVERS_PER_PATH)/src/at32f415_gpio.c \
@@ -54,48 +54,48 @@ $(DRIVERS_PER_PATH)/src/at32f415_misc.c \
 $(DRIVERS_PER_PATH)/src/at32f415_sdio.c \
 $(DRIVERS_PER_PATH)/src/at32f415_spi.c \
 
-CSRCS_BOARD =\
+TARGET_DRV_BOARD =\
 $(DRIVERS_CMSIS_PATH)/device_support/startup/system_at32f415.c\
 $(DRIVERS_CMSIS_PATH)/device_support/startup/startup_at32f415cbt7.c\
-project/415dk/415dk_board.c \
-project/415dk/415dk_clock.c \
-project/415dk/415dk_serial.c \
+$(TARGET_PATH)/415dk_board.c \
+$(TARGET_PATH)/415dk_clock.c \
+$(TARGET_PATH)/415dk_serial.c \
+$(TARGET_PATH)/at32_spiflash.c \
+$(TARGET_PATH)/at32_sdio.c \
 
-CSRCS_USB_CDC_MSC =\
-$(MIDDLEWARES_PATH)/usbd_class/composite_cdc_msc/cdc_msc_desc.c \
-$(MIDDLEWARES_PATH)/usbd_class/composite_cdc_msc/cdc_msc_class.c \
-$(MIDDLEWARES_PATH)/usbd_class/composite_cdc_msc/cdc_msc_bot_scsi.c
-
-CSRCS_USB_MSC =\
-$(MIDDLEWARES_PATH)/usbd_class/msc/msc_desc.c \
-$(MIDDLEWARES_PATH)/usbd_class/msc/msc_class.c \
-$(MIDDLEWARES_PATH)/usbd_class/msc/msc_bot_scsi.c \
-#$(APP_PATH)/src/msc_diskio_sdcard.c \
-
-CSRCS_USB =\
+TARGET_USB_CORE =\
 $(MIDDLEWARES_PATH)/usb_drivers/src/usb_core.c \
 $(MIDDLEWARES_PATH)/usb_drivers/src/usbd_core.c \
 $(MIDDLEWARES_PATH)/usb_drivers/src/usbd_sdr.c \
 $(MIDDLEWARES_PATH)/usb_drivers/src/usbd_int.c \
 $(CSRCS_USB_MSC) \
 
+TARGET_USB_CDC_MSC =\
+$(MIDDLEWARES_PATH)/usbd_class/composite_cdc_msc/cdc_msc_desc.c \
+$(MIDDLEWARES_PATH)/usbd_class/composite_cdc_msc/cdc_msc_class.c \
+$(MIDDLEWARES_PATH)/usbd_class/composite_cdc_msc/cdc_msc_bot_scsi.c
+
+TARGET_USB_MSC =\
+$(MIDDLEWARES_PATH)/usbd_class/msc/msc_desc.c \
+$(MIDDLEWARES_PATH)/usbd_class/msc/msc_class.c \
+$(MIDDLEWARES_PATH)/usbd_class/msc/msc_bot_scsi.c \
+
 
 CSRCS = \
-$(CSRCS_BOARD) \
-$(CSRCS_PERIPHERALS) \
-$(CSRCS_USB) \
+$(TARGET_DRV_PER) \
+$(TARGET_DRV_BOARD) \
+$(TARGET_USB_CORE) \
+$(TARGET_USB_MSC) \
 $(MIDDLEWARES_PATH)/3rd_party/fatfs/source/ff.c \
 $(MIDDLEWARES_PATH)/3rd_party/fatfs/source/ffunicode.c \
 $(MIDDLEWARES_PATH)/3rd_party/cli-simple/cli_simple.c \
 $(MIDDLEWARES_PATH)/3rd_party/cli-simple/syscalls.c \
 $(APP_PATH)/src/main.c \
-$(APP_PATH)/src/ff_diskio.c \
-$(APP_PATH)/src/msc_diskio.c \
-$(APP_PATH)/src/at32_sdio.c \
-$(APP_PATH)/src/at32_spiflash.c \
+$(APP_PATH)/src/diskio.c \
 $(APP_PATH)/src/flashspi.c \
-$(APP_PATH)/src/flashspi_gd25lq16.c \
+$(APP_PATH)/src/flashspi_gigadevice.c \
 $(APP_PATH)/src/flashspi_winbond.c \
+$(APP_PATH)/src/flashspi_renessas.c \
 
 
 CPPSRCS = \
@@ -211,7 +211,7 @@ endif
 #######################################
 # Rules
 #######################################
-default: sdcard
+default: spiflash #sdcard
 
 sdcard:
 	@$(MAKE) $(TARGET) SD_CARD=0 SD_CARD_LUN=0 SPI_FLASH=1 SPI_FLASH_LUN=1

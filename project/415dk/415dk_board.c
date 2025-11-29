@@ -40,12 +40,12 @@ void delay_us(uint32_t us)
     while(SysTick->VAL == systick);
 }
 
-uint32_t get_tick(void)
+uint32_t GetTick(void)
 {
     return ticms;
 }
 
-void at32_board_init(void)
+void board_init(void)
 {
     SystemInit();
     system_core_clock_update();

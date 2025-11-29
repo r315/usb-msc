@@ -265,7 +265,7 @@ static int flashCmd(int argc, char **argv)
         return CLI_OK_LF;
     }
 
-    const flashspi_t *fls = flashspi_get();
+    const flashspi_t *fls = flashspi_get_device();
 
     if(!fls){
         printf("No spi flash detected\n");
@@ -406,7 +406,7 @@ FRESULT mount(TCHAR *path, uint8_t m)
   */
 int main(void)
 {
-    at32_board_init();
+    board_init();
 
 	system_clock_config();
 

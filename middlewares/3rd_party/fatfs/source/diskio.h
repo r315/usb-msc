@@ -8,10 +8,6 @@
 #include "ff.h"			/* Obtains integer types */
 #include "string.h"
 
-
-//#define SD_CARD   0
-//#define SPI_FLASH 1
-
 #define SD_DEFAULT_BLOCK_SIZE 512
 
 /* Status of Disk Functions */

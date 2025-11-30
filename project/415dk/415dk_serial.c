@@ -41,18 +41,16 @@ void serial_init(void){
     crm_periph_clock_enable(CRM_GPIOA_PERIPH_CLOCK, TRUE);
     crm_periph_reset(CRM_USART1_PERIPH_CLOCK, TRUE);
 
-   
+
     USART1->ctrl1 = USART_CTRL1_VAL | RX_INT | TX_INT;
 
     USART1->baudr = clocks.apb2_freq / 115200;
 
     gpio_init_struct.gpio_mode           = GPIO_MODE_MUX;
     gpio_init_struct.gpio_drive_strength = GPIO_DRIVE_STRENGTH_MODERATE;
-    gpio_init_struct.gpio_pins           = GPIO_PINS_9;
-    gpio_init(GPIOA, &gpio_init_struct);
-    gpio_init_struct.gpio_mode           = GPIO_MODE_MUX;
-    gpio_init_struct.gpio_pull           = GPIO_PULL_UP;
-    gpio_init_struct.gpio_pins           = GPIO_PINS_10;
+    gpio_init_struct.gpio_pins           = GPIO_PINS_9 | GPIO_PINS_10;
+    gpio_init_struct.gpio_out_type       = GPIO_OUTPUT_PUSH_PULL;
+    gpio_init_struct.gpio_pull           = GPIO_PULL_NONE;
     gpio_init(GPIOA, &gpio_init_struct);
 
     rx_rd = rx_wr = tx_rd = tx_wr = 0;
@@ -75,7 +73,7 @@ void serial_init(void){
     dma_init_struct.priority = DMA_PRIORITY_LOW;
     dma_init_struct.loop_mode_enable = TRUE;
     dma_init(DMA1_CHANNEL5, &dma_init_struct);
-   
+
     USART1->ctrl3_bit.dmaren = TRUE;
     dma_channel_enable(DMA1_CHANNEL5, TRUE);
 #else
@@ -114,8 +112,8 @@ uint32_t serial_write(const uint8_t *buf, uint32_t len){
         }
         uart->dt = *buf++;
         #endif
-	}	
-	
+	}
+
     #if UART_ENABLE_TX_FIFO
 	uart->ctrl1_bit.tdbeien = 1;
     #endif
@@ -144,8 +142,8 @@ uint32_t serial_read(uint8_t *data, uint32_t len){
 void USART1_IRQHandler(void){
     uint32_t isrflags = USART1->sts;
     uint32_t errorflags = isrflags & 0x000F;
-    
-    if (errorflags){        
+
+    if (errorflags){
         // read DT after STS read clears error flags
         errorflags = USART1->dt;
         return;
@@ -157,7 +155,7 @@ void USART1_IRQHandler(void){
             rx_buf[rx_wr++] = USART1->dt;
             if(rx_wr == UART_BUFFER_SIZE){
                 rx_wr = 0;
-            }else{                
+            }else{
                 errorflags = USART1->dt;
             }
         }
@@ -173,7 +171,7 @@ void USART1_IRQHandler(void){
         }else{
             USART1->dt = tx_buf[tx_rd++];
             if(tx_rd == UART_BUFFER_SIZE){
-                tx_rd = 0; 
+                tx_rd = 0;
             }
         }
     }

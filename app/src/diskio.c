@@ -15,8 +15,8 @@
  */
 // =============================================================================
 #include "diskio.h"
-#include "cdc_msc_class.h"
 #include "flashspi.h"
+#include "cdc_msc_class.h"
 #include "msc_diskio.h"
 
 #define PRINT_DISKIO_DBG 0
@@ -63,7 +63,7 @@ uint8_t *get_inquiry (uint8_t lun)
  * @brief  Initialize flash
  * @retval 0: on success
  */
-usb_sts_type msc_init (uint8_t lun)
+usb_sts_type msc_disk_init (uint8_t lun)
 {
    switch (lun)
    {

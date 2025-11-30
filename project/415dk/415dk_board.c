@@ -19,7 +19,6 @@ void OTGFS1_IRQHandler(void)
   usbd_irq_handler(&otg_core_struct);
 }
 
-
 void delay_ms(uint32_t ms)
 {
     volatile uint32_t end = ticms + ms;

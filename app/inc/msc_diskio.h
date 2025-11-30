@@ -37,12 +37,18 @@
 /** @addtogroup 415_USB_device_msc
   * @{
   */
-//#define SPI_FLASH_LUN                    1
-//#define SD_CARD_LUN                      0
+#ifndef SD_CARD_LUN
+#define SD_CARD_LUN                      0
+#endif
+#ifndef SPI_FLASH_LUN
+#define SPI_FLASH_LUN                    1
+#endif
+#ifndef INTERNAL_FLASH_LUN
 #define INTERNAL_FLASH_LUN               2
+#endif
 
-usb_sts_type msc_init (uint8_t lun);
 uint8_t*     get_inquiry(uint8_t lun);
+usb_sts_type msc_disk_init(uint8_t lun);
 usb_sts_type msc_disk_read(uint8_t lun, uint32_t addr, uint8_t *read_buf, uint32_t len);
 usb_sts_type msc_disk_write(uint8_t lun, uint32_t addr, uint8_t *buf, uint32_t len);
 usb_sts_type msc_disk_capacity(uint8_t lun, uint32_t *blk_nbr, uint32_t *blk_size);

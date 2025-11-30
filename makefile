@@ -7,8 +7,9 @@ TARGET =usb-msc
 # Features
 #######################################
 
-FEATURE_ENABLE = \
-ENABLE_CLI
+FEATURES = \
+ENABLE_CLI \
+ENABLE_DISK_SPIFLASH \
 
 #######################################
 # paths
@@ -62,6 +63,7 @@ $(TARGET_PATH)/415dk_clock.c \
 $(TARGET_PATH)/415dk_serial.c \
 $(TARGET_PATH)/at32_spiflash.c \
 $(TARGET_PATH)/at32_sdio.c \
+$(TARGET_PATH)/syscalls.c \
 
 TARGET_USB_CORE =\
 $(MIDDLEWARES_PATH)/usb_drivers/src/usb_core.c \
@@ -80,16 +82,16 @@ $(MIDDLEWARES_PATH)/usbd_class/msc/msc_desc.c \
 $(MIDDLEWARES_PATH)/usbd_class/msc/msc_class.c \
 $(MIDDLEWARES_PATH)/usbd_class/msc/msc_bot_scsi.c \
 
+LIB_USB_SRC =\
+$(TARGET_USB_CORE) \
+$(TARGET_USB_MSC) \
 
 CSRCS = \
 $(TARGET_DRV_PER) \
 $(TARGET_DRV_BOARD) \
-$(TARGET_USB_CORE) \
-$(TARGET_USB_MSC) \
 $(MIDDLEWARES_PATH)/3rd_party/fatfs/source/ff.c \
 $(MIDDLEWARES_PATH)/3rd_party/fatfs/source/ffunicode.c \
 $(MIDDLEWARES_PATH)/3rd_party/cli-simple/cli_simple.c \
-$(MIDDLEWARES_PATH)/3rd_party/cli-simple/syscalls.c \
 $(APP_PATH)/src/main.c \
 $(APP_PATH)/src/diskio.c \
 $(APP_PATH)/src/flashspi.c \
@@ -97,33 +99,34 @@ $(APP_PATH)/src/flashspi_gigadevice.c \
 $(APP_PATH)/src/flashspi_winbond.c \
 $(APP_PATH)/src/flashspi_renessas.c \
 
-
 CPPSRCS = \
 
 ASRCS = \
 
 LDSCRIPT =$(DRIVERS_CMSIS_PATH)/device_support/startup/linker/AT32F415xB_FLASH.ld
 #######################################
-# Misc
+# Objects
 #######################################
 
-OCD_CONFIG =$(PROJECT_PATH)/at32f415.cfg
+OBJECTS =  $(addprefix $(BUILD_PATH)/, $(CSRCS:.c=.o))
+OBJECTS += $(addprefix $(BUILD_PATH)/, $(CPPSRCS:.c=.o))
+OBJECTS += $(addprefix $(BUILD_PATH)/, $(ASRCS:.s=.o))
+LIBUSB_OBJ = $(addprefix $(BUILD_PATH)/, $(LIB_USB_SRC:.c=.o))
 
+#######################################
+# Misc
+#######################################
 C_DEFS =\
 $(DEVICE) \
 BOARD_415DK \
 USE_STDPERIPH_DRIVER \
-SD_CARD=$(SD_CARD) \
-SPI_FLASH=$(SPI_FLASH) \
-SD_CARD_LUN=$(SD_CARD_LUN) \
-SPI_FLASH_LUN=$(SPI_FLASH_LUN) \
+$(FEATURES) \
+$(LUN) \
 
-C_DEFS +=$(FEATURE_ENABLE)
-
+OCD_CONFIG =$(PROJECT_PATH)/at32f415.cfg
 #######################################
 # CFLAGS
 #######################################
-
 DEVICE =AT32F415CBT7
 CPU =-mcpu=cortex-m4 -mthumb
 
@@ -151,9 +154,9 @@ VERBOSE =
 endif
 
 ASFLAGS  =$(MCU) $(AS_DEFS) $(AS_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction-sections
-CFLAGS   =$(MCU) $(OPT) $(addprefix -D, $(C_DEFS)) $(addprefix -I, $(C_INCLUDES)) -std=gnu11 -fdata-sections -ffunction-sections #-fstack-usage
+CFLAGS   =$(MCU) $(OPT) $(addprefix -D, $(C_DEFS)) $(addprefix -I, $(C_INCLUDES)) -fdata-sections -ffunction-sections -fno-builtin -std=gnu11
 CPPFLAGS =$(CPU) $(OPT) $(addprefix -D, $(C_DEFS)) $(addprefix -I, $(C_INCLUDES)) -fdata-sections -ffunction-sections -fno-unwind-tables -fno-exceptions -fno-rtti
-LDFLAGS  =$(MCU) $(SPECS) -Wl,-Map,$(BUILD_PATH)/$(TARGET).map,-gc-sections,-cref
+LDFLAGS  =$(MCU) $(SPECS) -Wl,-Map=$(BUILD_PATH)/$(TARGET).map,-gc-sections,-cref
 
 # Generate dependency information
 #CFLAGS += -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -Wa,-a,-ad,-alms=$(BUILD_PATH)/$(notdir $(<:.c=.lst))
@@ -161,27 +164,20 @@ LDFLAGS  =$(MCU) $(SPECS) -Wl,-Map,$(BUILD_PATH)/$(TARGET).map,-gc-sections,-cre
 #######################################
 # Libraries
 #######################################
+LIBDIR =$(BUILD_PATH)
 
-LIBDIR =
 ifdef SEMIHOSTING
 SPECS =--specs=rdimon.specs
 LDLIBS =-nostartfiles -lc -lrdimon
 else
+SPECS +=--specs=nano.specs
 #SPECS +=--specs=nosys.specs
-#SPECS +=--specs=nano.specs
-#LIBS +=-lstdc++
 #LIBS +=-lstd++
-#LIBS +=-lnosys
-#LIBS +=-nostdlib
+#LIBS +=-lstdc++
+LIBS +=-lnosys
+LIBS +=-nostdlib
+LIBS +=-lusbmsc
 endif
-
-#######################################
-# Objects
-#######################################
-
-OBJECTS =  $(addprefix $(BUILD_PATH)/, $(CSRCS:.c=.o))
-OBJECTS += $(addprefix $(BUILD_PATH)/, $(CPPSRCS:.c=.o))
-OBJECTS += $(addprefix $(BUILD_PATH)/, $(ASRCS:.s=.o))
 
 #######################################
 # Tool binaries
@@ -217,18 +213,12 @@ endif
 default: spiflash #sdcard
 
 sdcard:
-	@$(MAKE) $(TARGET) SD_CARD=0 SD_CARD_LUN=0 SPI_FLASH=1 SPI_FLASH_LUN=1
+	@$(MAKE) $(TARGET) LUN="SD_CARD_LUN=0 SPI_FLASH_LUN=1"
 	@echo "------- Build for SD card done -------"
 
 spiflash:
-	@$(MAKE) $(TARGET) "SD_CARD=1" SD_CARD_LUN=1 SPI_FLASH=0 SPI_FLASH_LUN=0
+	@$(MAKE) $(TARGET) LUN="SD_CARD_LUN=1 SPI_FLASH_LUN=0"
 	@echo "------- Build for spi flash done -------"
-
-$(TARGET): $(BUILD_PATH)/$(TARGET).elf
-	@echo "--- Size ---"
-	$(VERBOSE)$(SZ) -A -x $<
-	$(VERBOSE)$(SZ) -B $<
-
 
 bin: $(BUILD_PATH)/$(TARGET).bin
 
@@ -238,36 +228,46 @@ program: default $(PRG_DEP)
 erase:
 	$(ERASE_CMD)
 
+libusbmsc.a: $(LIBUSB_OBJ)
+	$(AR) rcs $@ $^
+
+test:
+	@$(foreach obj, $(LIBUSB_OBJ), echo $(obj);)
+
 $(BUILD_PATH)/$(TARGET).jlink: $(BUILD_DIR)/$(TARGET).bin
 	@echo "Creating Jlink configuration file"
 	@echo "loadfile $< 0x08000000" > $@
 	@echo "r" >> $@
 	@echo "q" >> $@
-
-test:
-	@$(foreach obj, $(C_DEFS), echo $(obj);)
-
 #######################################
 # build rules
 #######################################
+$(BUILD_PATH)/$(TARGET).elf: $(OBJECTS) $(BUILD_PATH)/libusbmsc.a
+	@echo "[LD]  $@"
+	$(VERBOSE)$(LD) -L$(LIBDIR) -T$(LDSCRIPT) $(LDFLAGS) $^ -o $@
+
+$(TARGET): $(BUILD_PATH)/$(TARGET).elf
+	@echo "--- Size ---"
+	$(VERBOSE)$(SZ) -A -x $<
+	$(VERBOSE)$(SZ) -B $<
+
 $(BUILD_PATH)/%.d: %.c
 	$(VERBOSE)$(CC) $(CFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(<:.c=.o)" "$<"
 
 $(BUILD_PATH)/%.o: %.c
 	@echo "[CC]  $<"
+	@mkdir -p $(dir $@)
 	$(VERBOSE)$(CC) -c $(CFLAGS) $< -o $@
 
 $(BUILD_PATH)/%.obj: %.cpp
 	@echo "[CP]  $<"
+	@mkdir -p $(dir $@)
 	$(VERBOSE)$(CPP) -c $(CPPFLAGS)  $< -o $@
 
 $(BUILD_PATH)/%.o: %.s
 	@echo "[AS]  $<"
+	@mkdir -p $(dir $@)
 	$(VERBOSE)$(AS) -c $(CFLAGS) $< -o $@
-
-$(BUILD_PATH)/$(TARGET).elf: $(BUILD_PATH) $(OBJECTS)
-	@echo "[LD]  $@"
-	$(VERBOSE)$(LD) $(LIBDIR) -T$(LDSCRIPT) $(LDFLAGS) $(OBJECTS) $(LIBS) -o $@
 
 $(BUILD_PATH)/%.hex: $(BUILD_PATH)/%.elf
 	$(VERBOSE)$(HEX) $< $@
@@ -277,6 +277,10 @@ $(BUILD_PATH)/%.bin: $(BUILD_PATH)/%.elf
 
 $(BUILD_PATH):
 	@$(foreach obj, $(OBJECTS), mkdir -p $(dir $(obj));)
+
+
+$(BUILD_PATH)/%.a: $(LIBUSB_OBJ)
+	$(AR) rcs $@ $^
 
 #######################################
 # clean up

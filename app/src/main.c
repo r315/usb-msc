@@ -31,6 +31,8 @@
 #include "cli_simple.h"
 #include "ff.h"
 #include "flashspi.h"
+#include "msc_diskio.h"
+#include "cdc_msc_class.h"
 
 typedef struct
 {
@@ -269,6 +271,13 @@ static int flashCmd(int argc, char **argv)
         return CLI_OK_LF;
     }
 
+    if(!strcmp(argv[1], "init")){
+        if(!flashspi_init()){
+            printf("spi flash initialized\n");
+        }
+        return CLI_OK;
+    }
+
     const flashspi_t *fls = flashspi_get_device();
 
     if(!fls){
@@ -418,15 +427,20 @@ int main(void)
 
 	NVIC_SetPriorityGrouping(NVIC_PRIORITY_GROUP_4);
 
+    #ifdef ENABLE_DISK_SDCARD
+    sd_init();
+    #endif
+
+    #ifdef ENABLE_DISK_SPIFLASH
+    msc_disk_init(SPI_FLASH_LUN);
+    #endif
+
     #ifdef ENABLE_CLI
     serial_init();
 
     CLI_Init("msd >", &serial_ops);
     CLI_RegisterCommand(cli_cmds, sizeof(cli_cmds) / sizeof(cli_command_t));
     printf("\rType 'help' for available commands\n");
-
-    sd_init();
-
     #else
     //mount(1);
 	usb_config();
@@ -442,12 +456,3 @@ int main(void)
         delay_ms(10);
 	}
 }
-
-int _write(int file, char *ptr, int len)
-{
-    if(file == 1){
-        return serial_write((uint8_t *)ptr, len);
-    }
-	return 0;
-}
-

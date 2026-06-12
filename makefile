@@ -14,31 +14,32 @@ ENABLE_DISK_SPIFLASH \
 #######################################
 # paths
 #######################################
-BUILD_DIR 		:=build
-PROJECT_PATH 	=.$(CWD)
-TARGET_PATH		=$(PROJECT_PATH)/project/415dk
+PROJECT_DIR        =.$(CWD)
+BUILD_DIR          :=build
+
+TARGET_PATH        =$(PROJECT_DIR)/project/415dk
 APP_PATH           =app
 DRIVERS_PER_PATH   =libraries/drivers
 DRIVERS_CMSIS_PATH =libraries/cmsis/cm4
 MIDDLEWARES_PATH   =middlewares
 
-BUILD_PATH =$(PROJECT_PATH)/$(BUILD_DIR)
+BUILD_PATH =$(PROJECT_DIR)/$(BUILD_DIR)
 #######################################
 # Includes
 #######################################
 C_INCLUDES = \
 $(APP_PATH)/inc \
-$(PROJECT_PATH)project/415dk \
+$(TARGET_PATH)project/415dk \
 $(DRIVERS_PER_PATH)/inc \
 $(DRIVERS_CMSIS_PATH)/device_support \
 $(DRIVERS_CMSIS_PATH)/core_support \
 $(MIDDLEWARES_PATH)/usb_drivers/inc \
 $(MIDDLEWARES_PATH)/usbd_class/composite_cdc_msc \
+$(MIDDLEWARES_PATH)/usbd_class/cdc \
 $(MIDDLEWARES_PATH)/usbd_class/msc \
 $(MIDDLEWARES_PATH)/3rd_party/fatfs/source \
 $(MIDDLEWARES_PATH)/3rd_party/cli-simple \
 $(TARGET_PATH) \
-#$(MIDDLEWARES_PATH)/usbd_class/msc \
 
 AS_INCLUDES =\
 
@@ -82,6 +83,14 @@ $(MIDDLEWARES_PATH)/usbd_class/msc/msc_desc.c \
 $(MIDDLEWARES_PATH)/usbd_class/msc/msc_class.c \
 $(MIDDLEWARES_PATH)/usbd_class/msc/msc_bot_scsi.c \
 
+TARGET_USB_CDC =\
+$(MIDDLEWARES_PATH)/usbd_class/cdc/cdc_desc.c \
+$(MIDDLEWARES_PATH)/usbd_class/cdc/cdc_class.c \
+
+TARGET_USB_HID_IAP =\
+$(MIDDLEWARES_PATH)/usbd_class/hid_iap/hid_iap_desc.c \
+$(MIDDLEWARES_PATH)/usbd_class/hid_iap/hid_iap_class.c \
+
 LIB_USB_SRC =\
 $(TARGET_USB_CORE) \
 $(TARGET_USB_MSC) \
@@ -122,8 +131,9 @@ BOARD_415DK \
 USE_STDPERIPH_DRIVER \
 $(FEATURES) \
 $(LUN) \
+#USB_DEVICE_MSC \
 
-OCD_CONFIG =$(PROJECT_PATH)/at32f415.cfg
+OCD_CONFIG =$(PROJECT_DIR)/at32f415.cfg
 #######################################
 # CFLAGS
 #######################################
@@ -196,7 +206,7 @@ BIN = $(OBJCOPY) -O binary -S
 
 ifeq ($(shell uname -s), Linux)
 PRG_DEP =bin
-PRG_CFG =$(PROJECT_PATH)/at32f415.cfg
+PRG_CFG =$(PROJECT_DIR)/at32f415.cfg
 PRG_CMD =openocd -f $(PRG_CFG) -c "program $(BUILD_PATH)/$(TARGET).elf verify reset exit"
 ERASE_CMD =openocd -f $(PRG_CFG) -c "init" -c "halt" -c "stm32f1x unlock 0" -c "stm32f1x mass_erase 0" -c "exit"
 else
@@ -232,7 +242,7 @@ libusbmsc.a: $(LIBUSB_OBJ)
 	$(AR) rcs $@ $^
 
 test:
-	@$(foreach obj, $(LIBUSB_OBJ), echo $(obj);)
+	@$(foreach obj, $(OBJECTS), echo $(obj);)
 
 $(BUILD_PATH)/$(TARGET).jlink: $(BUILD_DIR)/$(TARGET).bin
 	@echo "Creating Jlink configuration file"
@@ -278,9 +288,8 @@ $(BUILD_PATH)/%.bin: $(BUILD_PATH)/%.elf
 $(BUILD_PATH):
 	@$(foreach obj, $(OBJECTS), mkdir -p $(dir $(obj));)
 
-
 $(BUILD_PATH)/%.a: $(LIBUSB_OBJ)
-	$(AR) rcs $@ $^
+	$(VERBOSE)$(AR) rcs $@ $^
 
 #######################################
 # clean up

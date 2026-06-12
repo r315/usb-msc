@@ -3,6 +3,8 @@
 #include "msc_class.h"
 #include "msc_desc.h"
 #include "msc_diskio.h"
+#include "cdc_class.h"
+#include "cdc_desc.h"
 #include "usbd_int.h"
 
 
@@ -118,10 +120,17 @@ void usb_config(void)
   usbd_init(&otg_core_struct,
             USB_FULL_SPEED_CORE_ID,
             USB_ID,
+            #ifdef USB_DEVICE_MSC
             &msc_class_handler,
             &msc_desc_handler
-            //&cdc_msc_class_handler,
-            //&cdc_msc_desc_handler
+            #elif USB_DEVICE_CDC_MSC
+            &cdc_msc_class_handler,
+            &cdc_msc_desc_handler
+            #elif USB_DEVICE_CDC
+            &cdc_class_handler,
+            &cdc_desc_handler
+            #endif
+            // fail otherwise
         );
 }
 

@@ -93,9 +93,10 @@ extern "C" {
 #define USB_DESCIPTOR_TYPE_STRING        3 /*!< usb standard device type string */
 #define USB_DESCIPTOR_TYPE_INTERFACE     4 /*!< usb standard device type interface */
 #define USB_DESCIPTOR_TYPE_ENDPOINT      5 /*!< usb standard device type endpoint */
-#define USB_DESCIPTOR_TYPE_DEVICE_QUALIFIER     6 /*!< usb standard device type qualifier */
+#define USB_DESCIPTOR_TYPE_DEVICE_QUALIFIER 6 /*!< usb standard device type qualifier */
 #define USB_DESCIPTOR_TYPE_OTHER_SPEED   7 /*!< usb standard device type other speed */
-#define USB_DESCIPTOR_TYPE_INTERFACE_POWER       8 /*!< usb standard device type interface power */
+#define USB_DESCIPTOR_TYPE_INTERFACE_POWER 8 /*!< usb standard device type interface power */
+#define USB_DESCIPTOR_TYPE_INTERFACE_ASSOCIATION 11 /*!< usb standard device type interface power */
 
 /**
   * @brief usb standard string type
@@ -156,6 +157,7 @@ typedef enum
 #define USB_DEVICE_DESC_LEN              0x12 /*!< usb device descriptor length */
 #define USB_DEVICE_CFG_DESC_LEN          0x09 /*!< usb configuration descriptor length */
 #define USB_DEVICE_IF_DESC_LEN           0x09 /*!< usb interface descriptor length */
+#define USB_DEVICE_IA_DESC_LEN           0x08 /*!< usb interface association length */
 #define USB_DEVICE_EPT_LEN               0x07 /*!< usb endpoint descriptor length */
 #define USB_DEVICE_OTG_DESC_LEN          0x03 /*!< usb otg descriptor length */
 #define USB_DEVICE_LANGID_STR_DESC_LEN   0x04 /*!< usb lang id string descriptor length */
@@ -211,6 +213,7 @@ typedef enum
   */
 #define SET_LINE_CODING                   0x20
 #define GET_LINE_CODING                   0x21
+#define SET_CONTROL_LINE_STATE            0x22
 
 /**
   * @brief usb cdc class set line coding struct
@@ -269,6 +272,7 @@ typedef struct
   */
 #define LBYTE(x)  ((uint8_t)(x & 0x00FF))        /*!< low byte define */
 #define HBYTE(x)  ((uint8_t)((x & 0xFF00) >>8))  /*!< high byte define*/
+#define LHBYTE(x) LBYTE(x),HBYTE(x)
 
 /**
   * @brief usb return status

@@ -1,11 +1,13 @@
 #include <string.h>
 #include "board.h"
-#include "msc_class.h"
-#include "msc_desc.h"
-#include "msc_diskio.h"
-#include "cdc_class.h"
-#include "cdc_desc.h"
 #include "usbd_int.h"
+#include "msc_diskio.h"
+#include "msc/msc_class.h"
+#include "msc/msc_desc.h"
+#include "cdc/cdc_class.h"
+#include "cdc/cdc_desc.h"
+#include "composite_cdc_cdc/cdc_dual_class.h"
+#include "composite_cdc_cdc/cdc_dual_desc.h"
 
 
 static otg_core_type otg_core_struct;
@@ -129,6 +131,9 @@ void usb_config(void)
             #elif USB_DEVICE_CDC
             &cdc_class_handler,
             &cdc_desc_handler
+            #elif USB_DEVICE_CDC_DUAL
+            &cdc_dual_class_handler,
+            &cdc_dual_desc_handler
             #endif
             // fail otherwise
         );

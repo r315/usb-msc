@@ -70,7 +70,7 @@ typedef enum
 typedef struct
 {
   uint16_t length;                       /*!< descriptor length */
-  uint8_t *descriptor;                   /*!< descriptor string */
+  const uint8_t *descriptor;                   /*!< descriptor string */
 }usbd_desc_t;
 
 /**
@@ -78,20 +78,21 @@ typedef struct
   */
 typedef struct
 {
-  usbd_desc_t *(*get_device_descriptor)(void);                       /*!< get device descriptor callback */
-  usbd_desc_t *(*get_device_qualifier)(void);                        /*!< get device qualifier callback */
-  usbd_desc_t *(*get_device_configuration)(void);                    /*!< get device configuration callback */
-  usbd_desc_t *(*get_device_other_speed)(void);                      /*!< get device other speed callback */
-  usbd_desc_t *(*get_device_lang_id)(void);                          /*!< get device lang id callback */
-  usbd_desc_t *(*get_device_manufacturer_string)(void);              /*!< get device manufacturer callback */
-  usbd_desc_t *(*get_device_product_string)(void);                   /*!< get device product callback */
-  usbd_desc_t *(*get_device_serial_string)(void);                    /*!< get device serial callback */
-  usbd_desc_t *(*get_device_interface_string)(void);                 /*!< get device interface string callback */
-  usbd_desc_t *(*get_device_config_string)(void);                    /*!< get device device config callback */
+  const usbd_desc_t *(*get_device_descriptor)(void);                       /*!< get device descriptor callback */
+  const usbd_desc_t *(*get_device_qualifier)(void);                        /*!< get device qualifier callback */
+  const usbd_desc_t *(*get_device_configuration)(void);                    /*!< get device configuration callback */
+  const usbd_desc_t *(*get_device_other_speed)(void);                      /*!< get device other speed callback */
+  const usbd_desc_t *(*get_device_lang_id)(void);                          /*!< get device lang id callback */
+  const usbd_desc_t *(*get_device_manufacturer_string)(void);              /*!< get device manufacturer callback */
+  const usbd_desc_t *(*get_device_product_string)(void);                   /*!< get device product callback */
+  const usbd_desc_t *(*get_device_serial_string)(void);                    /*!< get device serial callback */
+  const usbd_desc_t *(*get_device_interface_string)(void);                 /*!< get device interface string callback */
+  const usbd_desc_t *(*get_device_config_string)(void);                    /*!< get device device config callback */
+  const usbd_desc_t *(*get_device_string)(uint8_t index);
 #if (USBD_SUPPORT_WINUSB == 1)
-  usbd_desc_t *(*get_device_winusb_os_string)(void);                 /*!< get winusb os string */
-  usbd_desc_t *(*get_device_winusb_os_feature)(void);                /*!< get winusb os feature */
-  usbd_desc_t *(*get_device_winusb_os_property)(void);               /*!< get winusb os property */
+  const usbd_desc_t *(*get_device_winusb_os_string)(void);                 /*!< get winusb os string */
+  const usbd_desc_t *(*get_device_winusb_os_feature)(void);                /*!< get winusb os feature */
+  const usbd_desc_t *(*get_device_winusb_os_property)(void);               /*!< get winusb os property */
 #endif
 }usbd_desc_handler;
 

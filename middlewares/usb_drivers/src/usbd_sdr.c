@@ -69,7 +69,7 @@ static usb_sts_type usbd_get_descriptor(usbd_core_type *udev)
 {
   usb_sts_type ret = USB_OK;
   uint16_t len = 0;
-  usbd_desc_t *desc = NULL;
+  const usbd_desc_t *desc = NULL;
   uint8_t desc_type = udev->setup.wValue >> 8;
   switch(desc_type)
   {
@@ -109,16 +109,18 @@ static usb_sts_type usbd_get_descriptor(usbd_core_type *udev)
             desc = udev->desc_handler->get_device_winusb_os_string();
           }
           else
+#else
           {
             usbd_ctrl_unsupport(udev);
           }
-#else
-          usbd_ctrl_unsupport(udev);
 #endif
           break;
         default:
-          udev->class_handler->setup_handler(udev, &udev->setup);
-          return ret;
+            desc = udev->desc_handler->get_device_string(str_desc);
+            if(!desc){
+                udev->class_handler->setup_handler(udev, &udev->setup);
+                return ret;
+            }
       }
       break;
     }
@@ -138,7 +140,7 @@ static usb_sts_type usbd_get_descriptor(usbd_core_type *udev)
     if((desc->length != 0) && (udev->setup.wLength != 0))
     {
       len = MIN(desc->length , udev->setup.wLength);
-      usbd_ctrl_send(udev, desc->descriptor, len);
+      usbd_ctrl_send(udev, (uint8_t*)desc->descriptor, len);
     }
   }
   return ret;
@@ -468,7 +470,6 @@ usb_sts_type usbd_endpoint_request(usbd_core_type *udev)
           }
           ept_info->status = 0x0000;
           usbd_ctrl_send(udev, (uint8_t *)(&ept_info->status), 2);
-          
           break;
         case USB_CONN_STATE_CONFIGURED:
         {

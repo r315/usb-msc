@@ -34,9 +34,7 @@ $(DRIVERS_PER_PATH)/inc \
 $(DRIVERS_CMSIS_PATH)/device_support \
 $(DRIVERS_CMSIS_PATH)/core_support \
 $(MIDDLEWARES_PATH)/usb_drivers/inc \
-$(MIDDLEWARES_PATH)/usbd_class/composite_cdc_msc \
-$(MIDDLEWARES_PATH)/usbd_class/cdc \
-$(MIDDLEWARES_PATH)/usbd_class/msc \
+$(MIDDLEWARES_PATH)/usbd_class \
 $(MIDDLEWARES_PATH)/3rd_party/fatfs/source \
 $(MIDDLEWARES_PATH)/3rd_party/cli-simple \
 $(TARGET_PATH) \
@@ -91,9 +89,14 @@ TARGET_USB_HID_IAP =\
 $(MIDDLEWARES_PATH)/usbd_class/hid_iap/hid_iap_desc.c \
 $(MIDDLEWARES_PATH)/usbd_class/hid_iap/hid_iap_class.c \
 
+TARGET_USB_CDC_CDC =\
+$(MIDDLEWARES_PATH)/usbd_class/composite_cdc_cdc/cdc_dual_desc.c \
+$(MIDDLEWARES_PATH)/usbd_class/composite_cdc_cdc/cdc_dual_class.c \
+
+
 LIB_USB_SRC =\
 $(TARGET_USB_CORE) \
-$(TARGET_USB_MSC) \
+$(TARGET_USB_CDC_CDC) \
 
 CSRCS = \
 $(TARGET_DRV_PER) \
@@ -131,6 +134,7 @@ BOARD_415DK \
 USE_STDPERIPH_DRIVER \
 $(FEATURES) \
 $(LUN) \
+USB_DEVICE_CDC_DUAL \
 #USB_DEVICE_MSC \
 
 OCD_CONFIG =$(PROJECT_DIR)/at32f415.cfg

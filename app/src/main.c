@@ -32,7 +32,7 @@
 #include "ff.h"
 #include "flashspi.h"
 #include "msc_diskio.h"
-#include "cdc_msc_class.h"
+#include "composite_cdc_msc/cdc_msc_class.h"
 
 typedef struct
 {
@@ -441,10 +441,9 @@ int main(void)
     CLI_Init("msd >", &serial_ops);
     CLI_RegisterCommand(cli_cmds, sizeof(cli_cmds) / sizeof(cli_command_t));
     printf("\rType 'help' for available commands\n");
-    #else
+    #endif
     //mount(1);
 	usb_config();
-    #endif
 
 	while(1)
 	{

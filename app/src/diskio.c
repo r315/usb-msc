@@ -16,7 +16,7 @@
 // =============================================================================
 #include "diskio.h"
 #include "flashspi.h"
-#include "cdc_msc_class.h"
+#include "composite_cdc_msc/cdc_msc_class.h"
 #include "msc_diskio.h"
 
 #define PRINT_DISKIO_DBG 0

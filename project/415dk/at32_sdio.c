@@ -1363,7 +1363,7 @@ sdio_error_t sd_init (void)
     if (status == SD_OK)
     {
         /* Set data width */
-        //status = sd_wide_bus_operation_config (SDIO_BUS_WIDTH_D4);
+        status = sd_wide_bus_operation_config (SDIO_BUS_WIDTH_D4);
     }
 
    return status;

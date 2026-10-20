@@ -6,10 +6,10 @@ TARGET =usb-msc
 #######################################
 # Features
 #######################################
-
-FEATURES += ENABLE_CLI ENABLE_CLI_COLOR
-#FEATURES += ENABLE_DISK_SPIFLASH
-FEATURES += ENABLE_DISK_SDCARD
+CONFIG += ENABLE_SERIAL
+CONFIG += ENABLE_CLI ENABLE_CLI_COLOR
+#CONFIG += ENABLE_DISK_SPIFLASH
+CONFIG += ENABLE_DISK_SDCARD
 
 #######################################
 # paths
@@ -132,7 +132,7 @@ C_DEFS =\
 $(DEVICE) \
 BOARD_415DK \
 USE_STDPERIPH_DRIVER \
-$(FEATURES) \
+$(CONFIG) \
 $(LUN) \
 USB_DEVICE_MSC \
 

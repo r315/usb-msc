@@ -61,6 +61,51 @@ static void dump_buffer(uint8_t *buf, uint32_t count)
 }
 
 #ifdef ENABLE_CLI
+const char *sd_errors[] = {
+    "SD_OK" ,
+    "SD_CMD_FAIL" ,
+    "SD_DATA_FAIL" ,
+    "SD_CMD_RSP_TIMEOUT" ,
+    "SD_DATA_TIMEOUT" ,
+    "SD_TX_UNDERRUN" ,
+    "SD_RX_OVERRUN" ,
+    "SD_START_BIT_ERR" ,
+    "SD_CMD_OUT_OF_RANGE" ,
+    "SD_ADDR_MISALIGNED" ,
+    "SD_BLK_LEN_ERR" ,
+    "SD_ERASE_SEQ_ERR" ,
+    "SD_INVALID_ERASE_PARAM" ,
+    "SD_WR_PROTECT_VIOLATION" ,
+    "SD_LOCK_UNLOCK_ERROR" ,
+    "SD_CMD_CRC_ERROR" ,
+    "SD_ILLEGAL_CMD" ,
+    "SD_CARD_ECC_ERROR" ,
+    "SD_CARD_CONTROLLER_ERR" ,
+    "SD_GENERAL_UNKNOWN_ERROR" ,
+    "SD_STREAM_RD_UNDERRUN" ,
+    "SD_STREAM_WR_OVERRUN" ,
+    "SD_CID_CSD_OVERWRITE" ,
+    "SD_WP_ERASE_SKIP" ,
+    "SD_CARD_ECC_DISABLED" ,
+    "SD_ERASE_RESET" ,
+    "SD_AKE_SEQ_ERROR" ,
+    "SD_INVALID_VOLTRANGE" ,
+    "SD_ADDR_OUT_OF_RANGE" ,
+    "SD_SWITCH_ERROR" ,
+    "SD_SDIO_DISABLED" ,
+    "SD_SDIO_FUNC_BUSY" ,
+    "SD_SDIO_FUNC_ERROR" ,
+    "SD_SDIO_UNKNOWN_FUNC" ,
+    "SD_INTERNAL_ERROR" ,
+    "SD_NOT_CONFIGURED" ,
+    "SD_REQ_PENDING" ,
+    "SD_REQ_NOT_APPLICABLE" ,
+    "SD_INVALID_PARAMETER" ,
+    "SD_UNSUPPORTED_FEATURE" ,
+    "SD_UNSUPPORTED_HW" ,
+    "SD_ERROR"
+};
+
 static int sdCardCmd(int argc, char **argv)
 {
     const char *card_types[] = {
@@ -75,52 +120,12 @@ static int sdCardCmd(int argc, char **argv)
         "SDIO_CARD"
     };
 
-    const char *sd_errors[] = {
-        "SD_OK" ,
-        "SD_CMD_FAIL" ,
-        "SD_DATA_FAIL" ,
-        "SD_CMD_RSP_TIMEOUT" ,
-        "SD_DATA_TIMEOUT" ,
-        "SD_TX_UNDERRUN" ,
-        "SD_RX_OVERRUN" ,
-        "SD_START_BIT_ERR" ,
-        "SD_CMD_OUT_OF_RANGE" ,
-        "SD_ADDR_MISALIGNED" ,
-        "SD_BLK_LEN_ERR" ,
-        "SD_ERASE_SEQ_ERR" ,
-        "SD_INVALID_ERASE_PARAM" ,
-        "SD_WR_PROTECT_VIOLATION" ,
-        "SD_LOCK_UNLOCK_ERROR" ,
-        "SD_CMD_CRC_ERROR" ,
-        "SD_ILLEGAL_CMD" ,
-        "SD_CARD_ECC_ERROR" ,
-        "SD_CARD_CONTROLLER_ERR" ,
-        "SD_GENERAL_UNKNOWN_ERROR" ,
-        "SD_STREAM_RD_UNDERRUN" ,
-        "SD_STREAM_WR_OVERRUN" ,
-        "SD_CID_CSD_OVERWRITE" ,
-        "SD_WP_ERASE_SKIP" ,
-        "SD_CARD_ECC_DISABLED" ,
-        "SD_ERASE_RESET" ,
-        "SD_AKE_SEQ_ERROR" ,
-        "SD_INVALID_VOLTRANGE" ,
-        "SD_ADDR_OUT_OF_RANGE" ,
-        "SD_SWITCH_ERROR" ,
-        "SD_SDIO_DISABLED" ,
-        "SD_SDIO_FUNC_BUSY" ,
-        "SD_SDIO_FUNC_ERROR" ,
-        "SD_SDIO_UNKNOWN_FUNC" ,
-        "SD_INTERNAL_ERROR" ,
-        "SD_NOT_CONFIGURED" ,
-        "SD_REQ_PENDING" ,
-        "SD_REQ_NOT_APPLICABLE" ,
-        "SD_INVALID_PARAMETER" ,
-        "SD_UNSUPPORTED_FEATURE" ,
-        "SD_UNSUPPORTED_HW" ,
-        "SD_ERROR"
-    };
-
     card_info_t *sd_card_info;
+
+    if(argc < 2){
+        printf("usage: sd <init | info | rb | eb>");
+        return CLI_OK;
+    }
 
     sd_card_info = sd_card_info_get ();
 
@@ -131,7 +136,12 @@ static int sdCardCmd(int argc, char **argv)
 
     if(!strcmp(argv[1], "info")) {
         printf("\tType: %s\n", card_types[sd_card_info->type]);
-        printf("\tCapacity: %llu bytes\n", sd_card_info->capacity);
+
+        if(sd_card_info->capacity < (1024 * 1024 * 1024)){
+            printf("\tCapacity: %u bytes\n", (unsigned int)sd_card_info->capacity);
+        }else{
+            printf("\tCapacity: %uMB\n", (unsigned int)(sd_card_info->capacity >> 20));
+        }
         printf("\tBlock size: %lu bytes\n", sd_card_info->block_size);
         printf("\tRelative card address (RCA): %u\n", sd_card_info->rca);
         /* SCR */
@@ -442,8 +452,13 @@ int main(void)
 
 	NVIC_SetPriorityGrouping(NVIC_PRIORITY_GROUP_4);
 
+    #ifdef ENABLE_SERIAL
+    serial_init();
+    #endif
+
     #ifdef ENABLE_DISK_SDCARD
-    sd_init();
+    sdio_error_t res = sd_init();
+    printf("SD Init: %s\n", sd_errors[res]);
     #endif
 
     #ifdef ENABLE_DISK_SPIFLASH
@@ -451,14 +466,12 @@ int main(void)
     #endif
 
     #ifdef ENABLE_CLI
-    serial_init();
-
     CLI_Init("msd >", &serial_ops);
     CLI_RegisterCommand(cli_cmds, sizeof(cli_cmds) / sizeof(cli_command_t));
     printf("\rType 'help' for available commands\n");
     #endif
     //mount(1);
-	usb_config();
+	//usb_config();
 
 	while(1)
 	{

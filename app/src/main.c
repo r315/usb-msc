@@ -334,8 +334,23 @@ static int echoCmd(int argc, char **argv)
     return CLI_OK_LF;
 }
 
+static int helpCmd(int argc, char **argv)
+{
+    putchar('\n');
+    printf("echo        Echo command\n");
+    printf("reset       reset board\n");
+    printf("plug        connect usb\n");
+    printf("unplug      disconnect usb\n");
+    printf("list        list file on mounted device\n");
+    printf("cat         print file content\n");
+    printf("flash       spi flash sub commands\n");
+    printf("sd          sd card sub commands\n");
+
+    return CLI_OK_LF;
+}
+
 cli_command_t cli_cmds [] = {
-    {"help", ((int (*)(int, char**))CLI_Commands)},
+    {"help", helpCmd},
     {"echo", echoCmd},
     {"reset", resetCmd},
     {"plug", plugCmd},

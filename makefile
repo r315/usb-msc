@@ -7,9 +7,9 @@ TARGET =usb-msc
 # Features
 #######################################
 
-FEATURES = \
-ENABLE_CLI \
-ENABLE_DISK_SPIFLASH \
+FEATURES += ENABLE_CLI ENABLE_CLI_COLOR
+#FEATURES += ENABLE_DISK_SPIFLASH
+FEATURES += ENABLE_DISK_SDCARD
 
 #######################################
 # paths
@@ -96,7 +96,7 @@ $(MIDDLEWARES_PATH)/usbd_class/composite_cdc_cdc/cdc_dual_class.c \
 
 LIB_USB_SRC =\
 $(TARGET_USB_CORE) \
-$(TARGET_USB_CDC_CDC) \
+$(TARGET_USB_MSC) \
 
 CSRCS = \
 $(TARGET_DRV_PER) \
@@ -134,8 +134,7 @@ BOARD_415DK \
 USE_STDPERIPH_DRIVER \
 $(FEATURES) \
 $(LUN) \
-USB_DEVICE_CDC_DUAL \
-#USB_DEVICE_MSC \
+USB_DEVICE_MSC \
 
 OCD_CONFIG =$(PROJECT_DIR)/at32f415.cfg
 #######################################

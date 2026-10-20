@@ -203,7 +203,8 @@ static usb_sts_type class_ept0_rx_handler(void *udev)
 {
   usb_sts_type status = USB_OK;
   usbd_core_type *pudev = (usbd_core_type *)udev;
-  uint32_t recv_len = usbd_get_recv_len(pudev, 0);
+  //uint32_t recv_len =
+  usbd_get_recv_len(pudev, 0);
   /* ...user code... */
   return status;
 }

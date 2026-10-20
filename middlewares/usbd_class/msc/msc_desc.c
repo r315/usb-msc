@@ -41,16 +41,16 @@
   * @{
   */
 
-static usbd_desc_t *get_device_descriptor(void);
-static usbd_desc_t *get_device_qualifier(void);
-static usbd_desc_t *get_device_configuration(void);
-static usbd_desc_t *get_device_other_speed(void);
-static usbd_desc_t *get_device_lang_id(void);
-static usbd_desc_t *get_device_manufacturer_string(void);
-static usbd_desc_t *get_device_product_string(void);
-static usbd_desc_t *get_device_serial_string(void);
-static usbd_desc_t *get_device_interface_string(void);
-static usbd_desc_t *get_device_config_string(void);
+static const usbd_desc_t *get_device_descriptor(void);
+static const usbd_desc_t *get_device_qualifier(void);
+static const usbd_desc_t *get_device_configuration(void);
+static const usbd_desc_t *get_device_other_speed(void);
+static const usbd_desc_t *get_device_lang_id(void);
+static const usbd_desc_t *get_device_manufacturer_string(void);
+static const usbd_desc_t *get_device_product_string(void);
+static const usbd_desc_t *get_device_serial_string(void);
+static const usbd_desc_t *get_device_interface_string(void);
+static const usbd_desc_t *get_device_config_string(void);
 
 static uint16_t usbd_unicode_convert(uint8_t *string, uint8_t *unicode_buf);
 static void usbd_int_to_unicode (uint32_t value , uint8_t *pbuf , uint8_t len);
@@ -288,7 +288,7 @@ static void get_serial_num(void)
   * @param  none
   * @retval usbd_desc
   */
-static usbd_desc_t *get_device_descriptor(void)
+static const usbd_desc_t *get_device_descriptor(void)
 {
   return &device_descriptor;
 }
@@ -298,7 +298,7 @@ static usbd_desc_t *get_device_descriptor(void)
   * @param  none
   * @retval usbd_desc
   */
-static usbd_desc_t * get_device_qualifier(void)
+static const usbd_desc_t * get_device_qualifier(void)
 {
   return NULL;
 }
@@ -308,7 +308,7 @@ static usbd_desc_t * get_device_qualifier(void)
   * @param  none
   * @retval usbd_desc
   */
-static usbd_desc_t *get_device_configuration(void)
+static const usbd_desc_t *get_device_configuration(void)
 {
   return &config_descriptor;
 }
@@ -318,7 +318,7 @@ static usbd_desc_t *get_device_configuration(void)
   * @param  none
   * @retval usbd_desc
   */
-static usbd_desc_t *get_device_other_speed(void)
+static const usbd_desc_t *get_device_other_speed(void)
 {
   return NULL;
 }
@@ -328,7 +328,7 @@ static usbd_desc_t *get_device_other_speed(void)
   * @param  none
   * @retval usbd_desc
   */
-static usbd_desc_t *get_device_lang_id(void)
+static const usbd_desc_t *get_device_lang_id(void)
 {
   return &langid_descriptor;
 }
@@ -339,7 +339,7 @@ static usbd_desc_t *get_device_lang_id(void)
   * @param  none
   * @retval usbd_desc
   */
-static usbd_desc_t *get_device_manufacturer_string(void)
+static const usbd_desc_t *get_device_manufacturer_string(void)
 {
   vp_desc.length = usbd_unicode_convert((uint8_t *)USBD_MSC_DESC_MANUFACTURER_STRING, g_usbd_desc_buffer);
   vp_desc.descriptor = g_usbd_desc_buffer;
@@ -351,7 +351,7 @@ static usbd_desc_t *get_device_manufacturer_string(void)
   * @param  none
   * @retval usbd_desc
   */
-static usbd_desc_t *get_device_product_string(void)
+static const usbd_desc_t *get_device_product_string(void)
 {
   vp_desc.length = usbd_unicode_convert((uint8_t *)USBD_MSC_DESC_PRODUCT_STRING, g_usbd_desc_buffer);
   vp_desc.descriptor = g_usbd_desc_buffer;
@@ -363,7 +363,7 @@ static usbd_desc_t *get_device_product_string(void)
   * @param  none
   * @retval usbd_desc
   */
-static usbd_desc_t *get_device_serial_string(void)
+static const usbd_desc_t *get_device_serial_string(void)
 {
   get_serial_num();
   return &serial_descriptor;
@@ -374,7 +374,7 @@ static usbd_desc_t *get_device_serial_string(void)
   * @param  none
   * @retval usbd_desc
   */
-static usbd_desc_t *get_device_interface_string(void)
+static const usbd_desc_t *get_device_interface_string(void)
 {
   vp_desc.length = usbd_unicode_convert((uint8_t *)USBD_MSC_DESC_INTERFACE_STRING, g_usbd_desc_buffer);
   vp_desc.descriptor = g_usbd_desc_buffer;
@@ -386,7 +386,7 @@ static usbd_desc_t *get_device_interface_string(void)
   * @param  none
   * @retval usbd_desc
   */
-static usbd_desc_t *get_device_config_string(void)
+static const usbd_desc_t *get_device_config_string(void)
 {
   vp_desc.length = usbd_unicode_convert((uint8_t *)USBD_MSC_DESC_CONFIGURATION_STRING, g_usbd_desc_buffer);
   vp_desc.descriptor = g_usbd_desc_buffer;

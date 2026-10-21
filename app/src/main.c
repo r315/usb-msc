@@ -52,10 +52,10 @@ FRESULT mount(TCHAR *path, uint8_t m);
 
 static void dump_buffer(uint8_t *buf, uint32_t count)
 {
-    for(int i = 0; i < count; i ++){
-        if( (i & 15) == 0)
+    for(int i = 0; i < count; i+=2){
+        if( (i & 31) == 0)
             printf("\n%04X: ", i);
-        printf("%02X ", buf[i]);
+        printf("%02X%02X ", buf[i], buf[i + 1]);
     }
     putchar('\n');
 }
@@ -123,16 +123,20 @@ static int sdCardCmd(int argc, char **argv)
     card_info_t *sd_card_info;
 
     if(argc < 2){
-        printf("usage: sd <init | info | rb | eb>");
-        return CLI_OK;
+        printf("usage: sd <init | info | rb | eb>\n");
+        printf("  init       card initialization\n");
+        printf("  info       basic card information\n");
+        printf("  rb <nr>    read block\n");
+        printf("  eb <nr>    erase block\n");
+        return CLI_OK_LF;
     }
-
-    sd_card_info = sd_card_info_get ();
 
     if(!strcmp(argv[1], "init")) {
         printf("SD Card Init: %s\n", sd_errors[(uint8_t)sd_mmc_card_init()]);
         return CLI_OK;
     }
+
+    sd_card_info = sd_card_info_get ();
 
     if(!strcmp(argv[1], "info")) {
         printf("\tType: %s\n", card_types[sd_card_info->type]);
@@ -165,7 +169,7 @@ static int sdCardCmd(int argc, char **argv)
     }
 
     if(!strcmp(argv[1], "rb")) {
-        uint8_t buffer[512]; // sd_card_info->card_blk_size];
+        uint8_t buffer[512]; // TODO: fix to use sd_card_info->block_size or specify size;
         uint32_t address;
         if(CLI_Ha2i(argv[2], &address)){
             sdio_error_t res = sd_block_read(buffer, address << 9, sizeof(buffer));

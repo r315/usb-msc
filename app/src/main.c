@@ -446,10 +446,6 @@ int main(void)
 {
     board_init();
 
-	system_clock_config();
-
-    system_tick_init();
-
 	NVIC_SetPriorityGrouping(NVIC_PRIORITY_GROUP_4);
 
     #ifdef ENABLE_SERIAL

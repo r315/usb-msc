@@ -43,8 +43,9 @@ uint32_t GetTick(void)
 void board_init(void)
 {
     SystemInit();
-    system_core_clock_update();
+    system_clock_config();
     system_tick_init();
+
     LED1_INIT;
     otg_core_struct.usb_reg = NULL;
 }

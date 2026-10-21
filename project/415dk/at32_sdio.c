@@ -397,6 +397,30 @@ static sdio_error_t sd_cmd41(uint32_t argument)
     return sd_rsp3();
 }
 
+/**
+ * @brief SEND SCR
+ * @param argument
+ * @return
+ */
+static sdio_error_t sd_cmd51(uint32_t argument)
+{
+    sdio_command_struct_type sdio_cmd = {
+        .argument = argument,
+        .cmd_index = SD_CMD_SD_APP_SEND_SCR,
+        .rsp_type = SDIO_RESPONSE_SHORT,
+        .wait_type = SDIO_WAIT_FOR_NO
+    };
+
+    sd_cmdx_send(&sdio_cmd);
+
+    return sd_rsp1(SD_CMD_SD_APP_SEND_SCR);
+}
+
+/**
+ * @brief APP_CMD
+ * @param argument
+ * @return
+ */
 static sdio_error_t sd_cmd55(uint32_t argument)
 {
     sdio_command_struct_type sdio_cmd = {
@@ -983,21 +1007,11 @@ sd_card_state_type sd_state_get(void)
  */
 static sdio_error_t sd_scr_read(uint32_t *buffer)
 {
-    uint32_t index = 0, sts_reg = 0;
+    uint32_t sts_reg = 0;
     sdio_error_t status = SD_OK;
 
-    /* send cmd16, set block length */
-    sdio_command_init_struct.argument = (uint32_t)8;
-    sdio_command_init_struct.cmd_index = SD_CMD_SET_BLOCKLEN;
-    sdio_command_init_struct.rsp_type = SDIO_RESPONSE_SHORT;
-    sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
-
-    /* sdio command config */
-    sdio_command_config(SDIOx, &sdio_command_init_struct);
-    /* enable ccsm */
-    sdio_command_state_machine_enable(SDIOx, TRUE);
-
-    status = sd_rsp1(SD_CMD_SET_BLOCKLEN);
+    /* send cmd16, set block length 8 bytes*/
+    status = sd_cmd16(8);
 
     if (status != SD_OK)
     {
@@ -1012,6 +1026,7 @@ static sdio_error_t sd_scr_read(uint32_t *buffer)
         return status;
     }
 
+    /* Clear data */
     sdio_data_init_struct.block_size = SDIO_DATA_BLOCK_SIZE_8B;
     sdio_data_init_struct.data_length = 8;
     sdio_data_init_struct.timeout = SD_DATATIMEOUT;
@@ -1021,16 +1036,8 @@ static sdio_error_t sd_scr_read(uint32_t *buffer)
     sdio_data_config(SDIOx, &sdio_data_init_struct);
     sdio_data_state_machine_enable(SDIOx, TRUE);
 
-    /* send cmd51 */
-    sdio_command_init_struct.argument = 0x0;
-    sdio_command_init_struct.cmd_index = SD_CMD_SD_APP_SEND_SCR;
-    sdio_command_init_struct.rsp_type = SDIO_RESPONSE_SHORT;
-    sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
-    /* sdio command config */
-    sdio_command_config(SDIOx, &sdio_command_init_struct);
-    /* enable ccsm */
-    sdio_command_state_machine_enable(SDIOx, TRUE);
-    status = sd_rsp1(SD_CMD_SD_APP_SEND_SCR);
+    /* send cmd51, read scr */
+    status = sd_cmd51(0);
     if (status != SD_OK)
     {
         return status;
@@ -1045,8 +1052,7 @@ static sdio_error_t sd_scr_read(uint32_t *buffer)
         // TODO: ADD Timeout
         if (sdio_flag_get(SDIOx, SDIO_RXBUF_FLAG) != RESET)
         {
-            *(buffer + index) = sdio_data_read(SDIOx);
-            index++;
+            *buffer++ = sdio_data_read(SDIOx);
         }
         sts_reg = SDIOx->sts;
     }

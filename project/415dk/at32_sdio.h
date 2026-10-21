@@ -437,6 +437,11 @@ typedef struct
   sd_memory_card_type type;
 } card_info_t;
 
+typedef struct sdio_handle {
+    sdio_type *sdio_x;
+    uint32_t clock_frequency;
+}sdio_handle_t;
+
 /**
   * @}
   */
@@ -446,7 +451,8 @@ typedef struct
   */
 
 /* sd exported functions ----------------------------------------*/
-sdio_error_t sd_init(void);
+sdio_error_t sd_mmc_init(void);
+sdio_error_t sd_mmc_card_init(void);
 card_info_t* sd_card_info_get(void);
 sdio_error_t sd_block_erase(uint64_t addr, uint32_t nblks);
 sdio_error_t sd_block_read(uint8_t *buf, uint64_t addr, uint16_t blk_size);

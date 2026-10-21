@@ -48,6 +48,9 @@ void board_init(void)
 
     LED1_INIT;
     otg_core_struct.usb_reg = NULL;
+    #ifdef ENABLE_DISK_SDCARD
+    sd_mmc_init();
+    #endif
 }
 
 /**

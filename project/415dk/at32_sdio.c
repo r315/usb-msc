@@ -16,11 +16,10 @@ static sdio_error_t mmc_switch(uint8_t set, uint8_t index, uint8_t value);
 static sdio_error_t sdio_switch_speed(uint32_t mode, uint32_t group, uint8_t value, uint8_t *rsp);
 static void sd_dma_config(uint32_t *mbuf, uint32_t buf_size, dma_dir_type dir);
 static void sd_card_info_parse(card_info_t *info);
+static sdio_error_t sdio_init(sdio_handle_t *hsdio);
 
 static sdio_command_struct_type sdio_command_init_struct;
 static sdio_data_struct_type sdio_data_init_struct;
-
-static sd_memory_card_type card_type = SDIO_STD_CAPACITY_SD_CARD_V1_1;
 
 static uint32_t csd_table[4], cid_table[4], rca = 0; /* csd, sid, rca */
 static sd_data_transfer_mode_type device_mode =
@@ -30,7 +29,8 @@ static uint8_t stop_flag = 0;                 /* transmit stop flag */
 volatile sdio_error_t transfer_error = SD_OK; /* transmit error flag */
 volatile uint8_t transfer_end = 0;            /* transmit end flag */
 
-static card_info_t card_info; /* card information */
+static card_info_t card_info; /* Information of last initialized card */
+static sdio_handle_t sdio_handle;
 
 /**
  * @brief  Get the exponent of the most significant that is set.
@@ -140,7 +140,6 @@ static sdio_error_t sdio_command_data_send(sdio_command_struct_type *sdio_cmd_in
                 {
                     if (0 == timeout)
                     {
-                        sd_init();
                         return SD_DATA_TIMEOUT;
                     }
 
@@ -172,7 +171,6 @@ static sdio_error_t sdio_command_data_send(sdio_command_struct_type *sdio_cmd_in
                 {
                     if (timeout == 0)
                     {
-                        sd_init();
                         return SD_DATA_TIMEOUT;
                     }
 
@@ -258,7 +256,6 @@ static sdio_error_t sdio_command_data_send(sdio_command_struct_type *sdio_cmd_in
 
         if (timeout == 0)
         {
-            sd_init();
             return SD_DATA_TIMEOUT;
         }
 
@@ -323,7 +320,7 @@ static sdio_error_t sd_speed_change(uint8_t speed)
             return SD_SWITCH_ERROR;
         }
     }
-    else if (card_type == SDIO_HIGH_SPEED_MULTIMEDIA_CARD)
+    else if (card_info.type == SDIO_HIGH_SPEED_MULTIMEDIA_CARD)
     {
         status = mmc_switch(EXT_CSD_CMD_SET_NORMAL, EXT_CSD_BUS_WIDTH,
                             (uint8_t)speed);
@@ -825,12 +822,8 @@ static sdio_error_t sd_mmc_power_on(void)
     uint32_t response = 0, count = 0, valid_voltage = 0;
     uint32_t sd_type;
 
-    crm_clocks_freq_type clocks;
-
-    crm_clocks_freq_get(&clocks);
-
     /* sdio_ck is less than 400KHz in initialization stage, set to 200KHz */
-    uint32_t clk_psc = (clocks.ahb_freq / 200000) - 2;
+    uint32_t clk_psc = (sdio_handle.clock_frequency / 200000) - 2;
 
     if (clk_psc > 0x3FF)
     {
@@ -897,12 +890,12 @@ static sdio_error_t sd_mmc_power_on(void)
 
     if (status == SD_OK)
     {
-        card_type = SDIO_STD_CAPACITY_SD_CARD_V2_0;
+        card_info.type = SDIO_STD_CAPACITY_SD_CARD_V2_0;
         sd_type = SD_HIGH_CAPACITY;
     }
     else
     {
-        card_type = SDIO_STD_CAPACITY_SD_CARD_V1_1;
+        card_info.type = SDIO_STD_CAPACITY_SD_CARD_V1_1;
         sd_type = SD_STD_CAPACITY;
     }
 
@@ -984,7 +977,7 @@ static sdio_error_t sd_mmc_power_on(void)
 
         if (response &= SD_HIGH_CAPACITY)
         {
-            card_type = SDIO_HIGH_CAPACITY_SD_CARD;
+            card_info.type = SDIO_HIGH_CAPACITY_SD_CARD;
         }
     }
     /* CMD55 was rejected it is a mmc card or no card present */
@@ -1025,7 +1018,7 @@ static sdio_error_t sd_mmc_power_on(void)
             return SD_INVALID_VOLTRANGE;
         }
 
-        card_type = SDIO_MULTIMEDIA_CARD;
+        card_info.type = SDIO_MULTIMEDIA_CARD;
     }
 
     return status;
@@ -1034,9 +1027,9 @@ static sdio_error_t sd_mmc_power_on(void)
 /**
  * @brief  turns the sdio output signals off.
  * @param  none
- * @retval sdio_error_t: sd card error code.
+ * @retval SD_OK
  */
-sdio_error_t sd_power_off(void)
+sdio_error_t sd_mmc_power_off(void)
 {
     /* sdio power off */
     sdio_power_set(SDIOx, SDIO_POWER_OFF);
@@ -1045,8 +1038,8 @@ sdio_error_t sd_power_off(void)
 }
 
 /**
- * @brief  intialises all cards or single card as the case may be card(s) come
- *         into standby state.
+ * @brief  Intialises all SD cards or single card
+ *  as the case may be card(s) come into standby state.
  * @param  none
  * @retval sdio_error_t: sd card error code.
  */
@@ -1062,7 +1055,7 @@ static sdio_error_t sd_card_init(void)
     }
 
     /* check is secure_digital_io_card or not */
-    if (SDIO_SECURE_DIGITAL_IO_CARD != card_type)
+    if (SDIO_SECURE_DIGITAL_IO_CARD != card_info.type)
     {
         /* send cmd2, get cid register */
         sdio_command_init_struct.argument = 0x0;
@@ -1088,10 +1081,10 @@ static sdio_error_t sd_card_init(void)
     }
 
     /* check card type */
-    if ((card_type == SDIO_STD_CAPACITY_SD_CARD_V1_1) ||
-        (card_type == SDIO_STD_CAPACITY_SD_CARD_V2_0) ||
-        (card_type == SDIO_SECURE_DIGITAL_IO_COMBO_CARD) ||
-        (card_type == SDIO_HIGH_CAPACITY_SD_CARD))
+    if ((card_info.type == SDIO_STD_CAPACITY_SD_CARD_V1_1) ||
+        (card_info.type == SDIO_STD_CAPACITY_SD_CARD_V2_0) ||
+        (card_info.type == SDIO_SECURE_DIGITAL_IO_COMBO_CARD) ||
+        (card_info.type == SDIO_HIGH_CAPACITY_SD_CARD))
     {
         /* send cmd3, get rca */
         sdio_command_init_struct.argument = 0x00;
@@ -1112,7 +1105,7 @@ static sdio_error_t sd_card_init(void)
     }
 
     /* mmc card */
-    if (card_type == SDIO_MULTIMEDIA_CARD)
+    if (card_info.type == SDIO_MULTIMEDIA_CARD)
     {
         /* send cmd3 */
         sdio_command_init_struct.argument = (uint32_t)(rca_temp << 16);
@@ -1133,7 +1126,7 @@ static sdio_error_t sd_card_init(void)
     }
 
     /* check is secure_digital_io_card or not */
-    if (card_type != SDIO_SECURE_DIGITAL_IO_CARD)
+    if (card_info.type != SDIO_SECURE_DIGITAL_IO_CARD)
     {
         rca = rca_temp;
         sdio_command_init_struct.argument = (uint32_t)(rca << 16);
@@ -1175,15 +1168,15 @@ static sdio_error_t sd_wide_bus_operation_config(sdio_bus_width_type mode)
 {
     sdio_error_t status = SD_OK;
 
-    if ((card_type == SDIO_MULTIMEDIA_CARD) ||
-        (card_type == SDIO_HIGH_SPEED_MULTIMEDIA_CARD))
+    if ((card_info.type == SDIO_MULTIMEDIA_CARD) ||
+        (card_info.type == SDIO_HIGH_SPEED_MULTIMEDIA_CARD))
     {
         status = mmc_switch(EXT_CSD_CMD_SET_NORMAL, EXT_CSD_BUS_WIDTH,
                             (uint8_t)mode);
     }
-    else if ((card_type == SDIO_STD_CAPACITY_SD_CARD_V1_1) ||
-             (card_type == SDIO_STD_CAPACITY_SD_CARD_V2_0) ||
-             (card_type == SDIO_HIGH_CAPACITY_SD_CARD))
+    else if ((card_info.type == SDIO_STD_CAPACITY_SD_CARD_V1_1) ||
+             (card_info.type == SDIO_STD_CAPACITY_SD_CARD_V2_0) ||
+             (card_info.type == SDIO_HIGH_CAPACITY_SD_CARD))
     {
         if (mode >= 2)
         {
@@ -1254,28 +1247,27 @@ static sdio_error_t sd_deselect_select(uint32_t addr)
     return command_rsp1_error(SD_CMD_SEL_DESEL_CARD);
 }
 
+
+
 /**
- * @brief  Initializes sdio peripheral and card.
- *         Card if present is put into standby
- *          state (ready for data transfer).
- * @param  none
- * @retval sdio_error_t: sd card error code.
+ * @brief Initializes sdio peripheral,
+ *       called at startup on board init
+ * @param
+ * @return
  */
-sdio_error_t sd_init(void)
+static sdio_error_t sdio_init(sdio_handle_t *hsdio)
 {
-    uint16_t clkdiv = 0;
-    sdio_error_t status = SD_OK;
     gpio_init_type gpio_init_struct = {0};
-    uint8_t retry = 3;
     crm_clocks_freq_type clocks;
 
-    memset(&card_info, 0, sizeof(card_info));
+    memset(hsdio, 0, sizeof(sdio_handle_t));
 
     crm_periph_clock_enable(CRM_GPIOA_PERIPH_CLOCK, TRUE);
     crm_periph_clock_enable(CRM_SDIO1_PERIPH_CLOCK, TRUE);
     crm_periph_clock_enable(CRM_IOMUX_PERIPH_CLOCK, TRUE);
 
     crm_clocks_freq_get(&clocks);
+    hsdio->clock_frequency = clocks.ahb_freq;
 
     gpio_init_struct.gpio_drive_strength = GPIO_DRIVE_STRENGTH_STRONGER;
     gpio_init_struct.gpio_mode = GPIO_MODE_MUX;
@@ -1288,6 +1280,42 @@ sdio_error_t sd_init(void)
     gpio_pin_remap_config(SDIO1_GMUX_0111, TRUE);
 
     nvic_irq_enable(SDIO1_IRQn, 0, 0);
+
+    hsdio->sdio_x = SDIOx;
+
+    return SD_OK;
+}
+
+/**
+ * @brief Initialyzes SD/MMC driver internal
+ *          data structures
+ * @param
+ * @return
+ */
+sdio_error_t sd_mmc_init(void)
+{
+    sdio_init(&sdio_handle);
+
+    return SD_OK;
+}
+
+/**
+ * @brief  Initializes SD/MMC card.
+ *   If a card is present, it is put into standby
+ *   state (ready for data transfer).
+ * @param  none
+ * @retval sdio_error_t: sd card error code.
+ */
+sdio_error_t sd_mmc_card_init(void)
+{
+    uint16_t clkdiv = 0;
+    sdio_error_t status = SD_OK;
+
+    uint8_t retry = 3;
+
+    memset(&card_info, 0, sizeof(card_info));
+
+    card_info.type = SDIO_STD_CAPACITY_SD_CARD_V1_1;
 
     while (retry--)
     {
@@ -1335,13 +1363,13 @@ sdio_error_t sd_init(void)
         status = sd_speed_change(0);
     }
 
-    if ((status == SD_OK) || (card_type == SDIO_MULTIMEDIA_CARD))
+    if ((status == SD_OK) || (card_info.type == SDIO_MULTIMEDIA_CARD))
     {
         if (card_info.type == SDIO_STD_CAPACITY_SD_CARD_V1_1 ||
             card_info.type == SDIO_STD_CAPACITY_SD_CARD_V2_0)
         {
             /* set sdio_ck to 12mhz */
-            clkdiv = clocks.ahb_freq / 12000000;
+            clkdiv = sdio_handle.clock_frequency  / 12000000;
 
             if (clkdiv >= 2)
             {
@@ -1351,7 +1379,7 @@ sdio_error_t sd_init(void)
         else
         {
             /* set sdio_ck to 48mhz */
-            clkdiv = clocks.ahb_freq / 48000000;
+            clkdiv = sdio_handle.clock_frequency  / 48000000;
 
             if (clkdiv >= 2)
             {
@@ -1359,7 +1387,7 @@ sdio_error_t sd_init(void)
             }
         }
         /* set sdio clock divider */
-        sdio_clock_set(clkdiv);
+        sdio_clock_config(SDIOx, clkdiv, SDIO_CLOCK_EDGE_FALLING);
 
         /* set transfer mode */
         status = sd_device_mode_set(SDIOx_TRANSFER_MODE);
@@ -1386,7 +1414,7 @@ static void sd_card_info_parse(card_info_t *card_info)
 {
     uint8_t tmp = 0;
 
-    card_info->type = (uint8_t)card_type;
+    //card_info->type = (uint8_t)card_info.type;
     card_info->rca = (uint16_t)rca;
 
     /* byte 0 */
@@ -1424,9 +1452,9 @@ static void sd_card_info_parse(card_info_t *card_info)
     card_info->csd.dsr_implemented = (tmp & 0x10) >> 4;
     card_info->csd.reserved2 = 0; /* reserved */
 
-    if ((card_type == SDIO_STD_CAPACITY_SD_CARD_V1_1) ||
-        (card_type == SDIO_STD_CAPACITY_SD_CARD_V2_0) ||
-        (card_type == SDIO_MULTIMEDIA_CARD))
+    if ((card_info->type == SDIO_STD_CAPACITY_SD_CARD_V1_1) ||
+        (card_info->type == SDIO_STD_CAPACITY_SD_CARD_V2_0) ||
+        (card_info->type == SDIO_MULTIMEDIA_CARD))
     {
         card_info->csd.device_size = (tmp & 0x03) << 10;
 
@@ -1457,7 +1485,7 @@ static void sd_card_info_parse(card_info_t *card_info)
                                 << (card_info->csd.max_read_blk_length);
         card_info->capacity *= card_info->block_size;
     }
-    else if (card_type == SDIO_HIGH_CAPACITY_SD_CARD)
+    else if (card_info->type == SDIO_HIGH_CAPACITY_SD_CARD)
     {
         /* byte 7 */
         tmp = (uint8_t)(csd_table[1] & 0x000000FF);
@@ -1847,7 +1875,7 @@ sdio_error_t sd_block_multi_read(uint8_t *buf, long long addr,
 
     SDIOx->dtctrl = 0x0;
 
-    if (card_type == SDIO_HIGH_CAPACITY_SD_CARD)
+    if (card_info.type == SDIO_HIGH_CAPACITY_SD_CARD)
     {
         blk_size = 512;
         addr >>= 9;
@@ -2088,7 +2116,7 @@ sdio_error_t sd_block_multi_write(const uint8_t *buf, long long addr,
         return SD_LOCK_UNLOCK_ERROR;
     }
 
-    if (card_type == SDIO_HIGH_CAPACITY_SD_CARD)
+    if (card_info.type == SDIO_HIGH_CAPACITY_SD_CARD)
     {
         blk_size = 512;
         addr >>= 9;
@@ -2142,9 +2170,9 @@ sdio_error_t sd_block_multi_write(const uint8_t *buf, long long addr,
         return SD_ERROR;
     }
 
-    if ((card_type == SDIO_STD_CAPACITY_SD_CARD_V1_1) ||
-        (card_type == SDIO_STD_CAPACITY_SD_CARD_V2_0) ||
-        (card_type == SDIO_HIGH_CAPACITY_SD_CARD))
+    if ((card_info.type == SDIO_STD_CAPACITY_SD_CARD_V1_1) ||
+        (card_info.type == SDIO_STD_CAPACITY_SD_CARD_V2_0) ||
+        (card_info.type == SDIO_HIGH_CAPACITY_SD_CARD))
     {
         /* send cmd55 */
         sdio_command_init_struct.argument = (uint32_t)rca << 16;

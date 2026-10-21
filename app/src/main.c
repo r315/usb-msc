@@ -130,7 +130,7 @@ static int sdCardCmd(int argc, char **argv)
     sd_card_info = sd_card_info_get ();
 
     if(!strcmp(argv[1], "init")) {
-        printf("SD Card Init: %s\n", sd_errors[(uint8_t)sd_init ()]);
+        printf("SD Card Init: %s\n", sd_errors[(uint8_t)sd_mmc_card_init()]);
         return CLI_OK;
     }
 
@@ -453,7 +453,7 @@ int main(void)
     #endif
 
     #ifdef ENABLE_DISK_SDCARD
-    sdio_error_t res = sd_init();
+    sdio_error_t res = sd_mmc_card_init();
     printf("SD Init: %s\n", sd_errors[res]);
     #endif
 

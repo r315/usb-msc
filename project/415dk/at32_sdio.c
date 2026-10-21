@@ -1589,30 +1589,6 @@ static sdio_error_t sd_wide_bus_operation_config(sdio_bus_width_type mode)
 }
 
 /**
- * @brief  set sdio work mode.
- * @param  mode
- *         parameter as following values:
- *         - SD_TRANSFER_POLLING_MODE: dma mode.
- *         - SD_TRANSFER_POLLING_MODE: polling mode.
- * @retval sdio_error_t: sd card error code.
- */
-static sdio_error_t sd_device_mode_set(uint32_t mode)
-{
-    sdio_error_t status = SD_OK;
-
-    if ((mode == SD_TRANSFER_DMA_MODE) || (mode == SD_TRANSFER_POLLING_MODE))
-    {
-        device_mode = (sd_data_transfer_mode_type)mode;
-    }
-    else
-    {
-        status = SD_INVALID_PARAMETER;
-    }
-
-    return status;
-}
-
-/**
  * @brief  selects or deselects the corresponding card.
  * @param  addr: address of the card to be selected.
  * @retval sdio_error_t: sd card error code.
@@ -1772,7 +1748,7 @@ sdio_error_t sd_mmc_card_init(void)
         sdio_clock_config(SDIOx, clkdiv, SDIO_CLOCK_EDGE_FALLING);
 
         /* set transfer mode */
-        status = sd_device_mode_set(SDIOx_TRANSFER_MODE);
+        device_mode = SDIOx_TRANSFER_MODE;
     }
 
     if (status == SD_OK)

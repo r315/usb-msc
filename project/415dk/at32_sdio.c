@@ -4,14 +4,6 @@
 #include "at32_sdio.h"
 #include "board.h"
 
-static sdio_error_t command_error(void);
-static sdio_error_t command_rsp1_error(uint8_t cmd);
-static sdio_error_t command_rsp2_error(void);
-static sdio_error_t command_rsp3_error(void);
-// static sdio_error_t command_rsp4_error (uint8_t cmd);
-// static sdio_error_t command_rsp5_error (uint8_t cmd);
-static sdio_error_t command_rsp6_error(uint8_t cmd, uint16_t *p_rca);
-static sdio_error_t command_rsp7_error(void);
 static sdio_error_t mmc_switch(uint8_t set, uint8_t index, uint8_t value);
 static sdio_error_t sdio_switch_speed(uint32_t mode, uint32_t group, uint8_t value, uint8_t *rsp);
 static void sd_dma_config(uint32_t *mbuf, uint32_t buf_size, dma_dir_type dir);
@@ -51,19 +43,319 @@ static uint8_t convert_from_bytes_to_power_of_two(uint16_t number_of_bytes)
     return count;
 }
 
-/**
- * @brief  set sdio clock devision factor.
- * @param  clkdiv: sdio_ck = ahbclk / (clkdiv+2)
- * @retval none
- */
-static void sdio_clock_set(uint32_t clk_div)
-{
-    /* config clock divide [7:0] */
-    SDIOx->clkctrl_bit.clkdiv_l = (clk_div & 0xFF);
 
-    /* config clock divide [9:8] */
-    SDIOx->clkctrl_bit.clkdiv_h = ((clk_div & 0x300) >> 8);
+/**
+ * @brief  checks for error conditions for R1 response.
+ * @param  cmd: the sent command index.
+ * @retval sdio_error_t: sd card error code.
+ */
+static sdio_error_t sd_rsp1(uint8_t cmd)
+{
+    uint32_t sts_reg = 0;
+
+    while (1)
+    {
+        sts_reg = SDIOx->sts;
+
+        if (sts_reg &
+            (SDIO_CMDFAIL_FLAG | SDIO_CMDTIMEOUT_FLAG | SDIO_CMDRSPCMPL_FLAG))
+        {
+            break;
+        }
+    }
+
+    if (sdio_flag_get(SDIOx, SDIO_CMDTIMEOUT_FLAG) != RESET)
+    {
+        sdio_flag_clear(SDIOx, SDIO_CMDTIMEOUT_FLAG);
+        return SD_CMD_RSP_TIMEOUT;
+    }
+
+    if (sdio_flag_get(SDIOx, SDIO_CMDFAIL_FLAG) != RESET)
+    {
+        sdio_flag_clear(SDIOx, SDIO_CMDFAIL_FLAG);
+        return SD_CMD_FAIL;
+    }
+
+    if (sdio_command_response_get(SDIOx) != cmd)
+    {
+        return SD_ILLEGAL_CMD;
+    }
+
+    sdio_flag_clear(SDIOx, SDIO_STATIC_FLAGS);
+
+    return (sdio_error_t)(sdio_response_get(SDIOx, SDIO_RSP1_INDEX) &
+                          SD_OCR_ERRORBITS);
 }
+
+/**
+ * @brief  checks for error conditions for R2 (cid or csd) response.
+ * @param  none
+ * @retval sdio_error_t: sd card error code.
+ */
+static sdio_error_t sd_rsp2(void)
+{
+    sdio_error_t status = SD_OK;
+    uint32_t sts_reg;
+    uint32_t timeout = SDIO_CMD0TIMEOUT;
+
+    while (timeout--)
+    {
+        sts_reg = SDIOx->sts;
+
+        if (sts_reg &
+            (SDIO_CMDFAIL_FLAG | SDIO_CMDTIMEOUT_FLAG | SDIO_CMDRSPCMPL_FLAG))
+        {
+            break;
+        }
+    }
+
+    if ((timeout == 0) || sdio_flag_get(SDIOx, SDIO_CMDTIMEOUT_FLAG) != RESET)
+    {
+        status = SD_CMD_RSP_TIMEOUT;
+        sdio_flag_clear(SDIOx, SDIO_CMDTIMEOUT_FLAG);
+
+        return status;
+    }
+
+    if (sdio_flag_get(SDIOx, SDIO_CMDFAIL_FLAG) != RESET)
+    {
+        status = SD_CMD_FAIL;
+        sdio_flag_clear(SDIOx, SDIO_CMDFAIL_FLAG);
+    }
+
+    sdio_flag_clear(SDIOx, SDIO_STATIC_FLAGS);
+
+    return status;
+}
+
+/**
+ * @brief  checks for error conditions for R3 (ocr) response.
+ * @param  none
+ * @retval sdio_error_t: sd card error code.
+ */
+static sdio_error_t sd_rsp3(void)
+{
+    uint32_t sts_reg = 0;
+    ;
+
+    while (1)
+    {
+        sts_reg = SDIOx->sts;
+
+        if (sts_reg &
+            (SDIO_CMDFAIL_FLAG | SDIO_CMDTIMEOUT_FLAG | SDIO_CMDRSPCMPL_FLAG))
+        {
+            break;
+        }
+    }
+
+    if (sdio_flag_get(SDIOx, SDIO_CMDTIMEOUT_FLAG) != RESET)
+    {
+        sdio_flag_clear(SDIOx, SDIO_CMDTIMEOUT_FLAG);
+        return SD_CMD_RSP_TIMEOUT;
+    }
+
+    sdio_flag_clear(SDIOx, SDIO_STATIC_FLAGS);
+
+    return SD_OK;
+}
+
+/**
+ * @brief  checks for error conditions for r6 (rca) response.
+ * @param  cmd: the sent command index.
+ * @param  prca: pointer to the variable that will contain the sd card relative
+ *         address rca.
+ * @retval sdio_error_t: sd card error code.
+ */
+static sdio_error_t sd_rsp6(uint8_t cmd, uint16_t *prca)
+{
+    sdio_error_t status = SD_OK;
+    uint32_t sts_reg, rsp_cmd = 0, response = 0;
+
+    while (1)
+    {
+        sts_reg = SDIOx->sts;
+
+        if (sts_reg &
+            (SDIO_CMDFAIL_FLAG | SDIO_CMDTIMEOUT_FLAG | SDIO_CMDRSPCMPL_FLAG))
+        {
+            break;
+        }
+    }
+
+    if (sdio_flag_get(SDIOx, SDIO_CMDTIMEOUT_FLAG) != RESET)
+    {
+        sdio_flag_clear(SDIOx, SDIO_CMDTIMEOUT_FLAG);
+        return SD_CMD_RSP_TIMEOUT;
+    }
+
+    if (sdio_flag_get(SDIOx, SDIO_CMDFAIL_FLAG) != RESET)
+    {
+        sdio_flag_clear(SDIOx, SDIO_CMDFAIL_FLAG);
+        return SD_CMD_FAIL;
+    }
+
+    rsp_cmd = sdio_command_response_get(SDIOx);
+    if (rsp_cmd != cmd)
+    {
+        return SD_ILLEGAL_CMD;
+    }
+
+    sdio_flag_clear(SDIOx, SDIO_STATIC_FLAGS);
+
+    response = sdio_response_get(SDIOx, SDIO_RSP1_INDEX);
+
+    if (SD_ALLZERO == (response & (SD_R6_GENERAL_UNKNOWN_ERROR |
+                                   SD_R6_ILLEGAL_CMD | SD_R6_CMD_CRC_ERROR)))
+    {
+        *prca = (uint16_t)(response >> 16);
+        return status;
+    }
+
+    if (response & SD_R6_GENERAL_UNKNOWN_ERROR)
+    {
+        return SD_GENERAL_UNKNOWN_ERROR;
+    }
+
+    if (response & SD_R6_ILLEGAL_CMD)
+    {
+        return SD_ILLEGAL_CMD;
+    }
+
+    if (response & SD_R6_CMD_CRC_ERROR)
+    {
+        return SD_CMD_CRC_ERROR;
+    }
+
+    return status;
+}
+
+/**
+ * @brief  checks for error conditions for R7 response.
+ * @param  none
+ * @retval sdio_error_t: sd card error code.
+ */
+static sdio_error_t sd_rsp7(void)
+{
+    sdio_error_t status = SD_OK;
+    uint32_t sts_reg = 0;
+    uint32_t timeout = SDIO_CMD0TIMEOUT;
+
+    while (timeout--)
+    {
+        sts_reg = SDIOx->sts;
+
+        if (sts_reg &
+            (SDIO_CMDFAIL_FLAG | SDIO_CMDTIMEOUT_FLAG | SDIO_CMDRSPCMPL_FLAG))
+        {
+            break;
+        }
+    }
+
+    if ((timeout == 0) || (sts_reg & SDIO_CMDTIMEOUT_FLAG))
+    {
+        status = SD_CMD_RSP_TIMEOUT;
+        sdio_flag_clear(SDIOx, SDIO_CMDTIMEOUT_FLAG);
+        return status;
+    }
+
+    if (sts_reg & SDIO_CMDRSPCMPL_FLAG)
+    {
+        status = SD_OK;
+        sdio_flag_clear(SDIOx, SDIO_CMDRSPCMPL_FLAG);
+    }
+
+    return status;
+}
+
+static void sd_cmdx_send(sdio_command_struct_type *sdio_cmd)
+{
+    /* sdio command config */
+    sdio_command_config(SDIOx, sdio_cmd);
+    /* enable ccsm */
+    sdio_command_state_machine_enable(SDIOx, TRUE);
+}
+
+static sdio_error_t sd_cmd0(void)
+{
+    uint32_t timeout = SDIO_CMD0TIMEOUT;
+    sdio_command_struct_type sdio_cmd = {
+        .argument = 0,
+        .cmd_index = SD_CMD_GO_IDLE_STATE,
+        .rsp_type = SDIO_RESPONSE_NO,
+        .wait_type = SDIO_WAIT_FOR_NO
+    };
+
+    sd_cmdx_send(&sdio_cmd);
+
+    while (timeout--)
+    {
+        if (sdio_flag_get(SDIOx, SDIO_CMDCMPL_FLAG) != RESET)
+        {
+            sdio_flag_clear(SDIOx, SDIO_STATIC_FLAGS);
+            return SD_OK;
+        }
+    }
+
+    return SD_CMD_RSP_TIMEOUT;
+}
+
+static sdio_error_t sd_cmd1(uint32_t argument)
+{
+    sdio_command_struct_type sdio_cmd = {
+        .argument = argument,
+        .cmd_index = SD_CMD_SEND_OP_COND,
+        .rsp_type = SDIO_RESPONSE_SHORT,
+        .wait_type = SDIO_WAIT_FOR_NO
+    };
+
+    sd_cmdx_send(&sdio_cmd);
+
+    return sd_rsp3();
+}
+
+static sdio_error_t sd_cmd8(uint32_t argument)
+{
+    sdio_command_struct_type sdio_cmd = {
+        .argument = argument,
+        .cmd_index = SDIO_SEND_IF_COND,
+        .rsp_type = SDIO_RESPONSE_SHORT,
+        .wait_type = SDIO_WAIT_FOR_NO
+    };
+
+    sd_cmdx_send(&sdio_cmd);
+
+    return sd_rsp7();
+}
+
+static sdio_error_t sd_cmd41(uint32_t argument)
+{
+    sdio_command_struct_type sdio_cmd = {
+        .argument = argument,
+        .cmd_index = SD_CMD_SD_APP_OP_COND,
+        .rsp_type = SDIO_RESPONSE_SHORT,
+        .wait_type = SDIO_WAIT_FOR_NO
+    };
+
+    sd_cmdx_send(&sdio_cmd);
+
+    return sd_rsp3();
+}
+
+static sdio_error_t sd_cmd55(uint32_t argument)
+{
+    sdio_command_struct_type sdio_cmd = {
+        .argument = argument,
+        .cmd_index = SD_CMD_APP_CMD,
+        .rsp_type = SDIO_RESPONSE_SHORT,
+        .wait_type = SDIO_WAIT_FOR_NO
+    };
+
+    sd_cmdx_send(&sdio_cmd);
+
+    return sd_rsp1(SD_CMD_APP_CMD);
+}
+
 
 /**
  * @brief  read data from or write data to sd card.
@@ -113,7 +405,7 @@ static sdio_error_t sdio_command_data_send(sdio_command_struct_type *sdio_cmd_in
     /* enable ccsm */
     sdio_command_state_machine_enable(SDIOx, TRUE);
 
-    status = command_rsp1_error(sdio_cmd_init_t->cmd_index);
+    status = sd_rsp1(sdio_cmd_init_t->cmd_index);
     if (status != SD_OK)
     {
         return status;
@@ -223,7 +515,7 @@ static sdio_error_t sdio_command_data_send(sdio_command_struct_type *sdio_cmd_in
             /* enable ccsm */
             sdio_command_state_machine_enable(SDIOx, TRUE);
 
-            status = command_rsp1_error(SD_CMD_STOP_TRANSMISSION);
+            status = sd_rsp1(SD_CMD_STOP_TRANSMISSION);
 
             if (status != SD_OK)
             {
@@ -369,7 +661,7 @@ static sdio_error_t sdio_switch_speed(uint32_t mode, uint32_t group, uint8_t val
     /* enable ccsm */
     sdio_command_state_machine_enable(SDIOx, TRUE);
 
-    status = command_rsp1_error(SD_CMD_SET_BLOCKLEN);
+    status = sd_rsp1(SD_CMD_SET_BLOCKLEN);
 
     if (status != SD_OK)
     {
@@ -426,17 +718,7 @@ static sdio_error_t sdio_bus_wide_enable(confirm_state new_state)
 
     if (card_info.scr.sd_bus_widths)
     {
-        sdio_command_init_struct.argument = (uint32_t)(card_info.rca << 16);
-        sdio_command_init_struct.cmd_index = SD_CMD_APP_CMD;
-        sdio_command_init_struct.rsp_type = SDIO_RESPONSE_SHORT;
-        sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
-
-        /* sdio command config */
-        sdio_command_config(SDIOx, &sdio_command_init_struct);
-        /* enable ccsm */
-        sdio_command_state_machine_enable(SDIOx, TRUE);
-
-        status = command_rsp1_error(SD_CMD_APP_CMD);
+        status = sd_cmd55((uint32_t)card_info.rca << 16);
 
         if (status != SD_OK)
         {
@@ -453,7 +735,7 @@ static sdio_error_t sdio_bus_wide_enable(confirm_state new_state)
         /* enable ccsm */
         sdio_command_state_machine_enable(SDIOx, TRUE);
 
-        status = command_rsp1_error(SD_CMD_APP_SD_SET_BUSWIDTH);
+        status = sd_rsp1(SD_CMD_APP_SD_SET_BUSWIDTH);
         return status;
     }
     else
@@ -482,7 +764,7 @@ static sdio_error_t sd_irq_service(void)
             sdio_command_config(SDIOx, &sdio_command_init_struct);
             /* enable ccsm */
             sdio_command_state_machine_enable(SDIOx, TRUE);
-            transfer_error = command_rsp1_error(SD_CMD_STOP_TRANSMISSION);
+            transfer_error = sd_rsp1(SD_CMD_STOP_TRANSMISSION);
         }
         else
         {
@@ -609,7 +891,7 @@ static sdio_error_t sd_status_send(uint32_t *p_card_status)
     /* enable ccsm */
     sdio_command_state_machine_enable(SDIOx, TRUE);
 
-    status = command_rsp1_error(SD_CMD_SEND_STATUS);
+    status = sd_rsp1(SD_CMD_SEND_STATUS);
 
     if (status != SD_OK)
     {
@@ -660,7 +942,7 @@ static sdio_error_t sd_scr_read(uint32_t *buffer)
     /* enable ccsm */
     sdio_command_state_machine_enable(SDIOx, TRUE);
 
-    status = command_rsp1_error(SD_CMD_SET_BLOCKLEN);
+    status = sd_rsp1(SD_CMD_SET_BLOCKLEN);
 
     if (status != SD_OK)
     {
@@ -668,17 +950,7 @@ static sdio_error_t sd_scr_read(uint32_t *buffer)
     }
 
     /* send cmd55 */
-    sdio_command_init_struct.argument = (uint32_t)(card_info.rca << 16);
-    sdio_command_init_struct.cmd_index = SD_CMD_APP_CMD;
-    sdio_command_init_struct.rsp_type = SDIO_RESPONSE_SHORT;
-    sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
-
-    /* sdio command config */
-    sdio_command_config(SDIOx, &sdio_command_init_struct);
-    /* enable ccsm */
-    sdio_command_state_machine_enable(SDIOx, TRUE);
-
-    status = command_rsp1_error(SD_CMD_APP_CMD);
+    status = sd_cmd55((uint32_t)card_info.rca << 16);
 
     if (status != SD_OK)
     {
@@ -699,14 +971,11 @@ static sdio_error_t sd_scr_read(uint32_t *buffer)
     sdio_command_init_struct.cmd_index = SD_CMD_SD_APP_SEND_SCR;
     sdio_command_init_struct.rsp_type = SDIO_RESPONSE_SHORT;
     sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
-
     /* sdio command config */
     sdio_command_config(SDIOx, &sdio_command_init_struct);
     /* enable ccsm */
     sdio_command_state_machine_enable(SDIOx, TRUE);
-
-    status = command_rsp1_error(SD_CMD_SD_APP_SEND_SCR);
-
+    status = sd_rsp1(SD_CMD_SD_APP_SEND_SCR);
     if (status != SD_OK)
     {
         return status;
@@ -812,6 +1081,9 @@ static sdio_error_t sd_programming_status(uint8_t *p_status)
 /**
  * @brief  enquires cards about their operating voltage and configures
  *         clock controls.
+ *
+ * Part A2, 3.6 Card initialization and identification
+ *
  * @param  none
  * @retval sdio_error_t: sd card error code.
  */
@@ -819,20 +1091,19 @@ static sdio_error_t sd_mmc_power_on(void)
 {
     uint8_t retry = 0;
     sdio_error_t status = SD_OK;
-    uint32_t response = 0, count = 0, valid_voltage = 0;
+    uint32_t response = 0, count = 0;
     uint32_t sd_type;
 
     /* sdio_ck is less than 400KHz in initialization stage, set to 200KHz */
     uint32_t clk_psc = (sdio_handle.clock_frequency / 200000) - 2;
 
-    if (clk_psc > 0x3FF)
-    {
+    if (clk_psc > 0x3FF) {
         clk_psc = 0x3FF;
     }
 
     /* config sdio clock divide and edge phase */
     sdio_clock_config(SDIOx, clk_psc, SDIO_CLOCK_EDGE_FALLING);
-    /* config sdio bus width */
+    /* config sdio bus width to single bit */
     sdio_bus_width_config(SDIOx, SDIO_BUS_WIDTH_D1);
     /* disable flow control */
     sdio_flow_control_enable(SDIOx, FALSE);
@@ -840,7 +1111,6 @@ static sdio_error_t sd_mmc_power_on(void)
     sdio_clock_bypass(SDIOx, FALSE);
     /* disable power saving mode */
     sdio_power_saving_mode_enable(SDIOx, FALSE);
-
     /* sdio power on */
     sdio_power_set(SDIOx, SDIO_POWER_ON);
     /* enable to output sdio_ck */
@@ -851,113 +1121,30 @@ static sdio_error_t sd_mmc_power_on(void)
      * See Figure 4-2 on Physical Layer simplified specification
      * for initialization flow
      */
-
-    for (retry = 0; retry < 5; retry++)
-    {
+    for (retry = 0; retry < 5; retry++) {
         /* send cmd0, get in idle stage */
-        sdio_command_init_struct.argument = 0x0;
-        sdio_command_init_struct.cmd_index = SD_CMD_GO_IDLE_STATE;
-        sdio_command_init_struct.rsp_type = SDIO_RESPONSE_NO;
-        sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
-
-        /* sdio command config */
-        sdio_command_config(SDIOx, &sdio_command_init_struct);
-        /* enable ccsm */
-        sdio_command_state_machine_enable(SDIOx, TRUE);
-
-        /* get command status */
-        status = command_error();
-
-        if (status == SD_CMD_RSP_TIMEOUT)
-        {
+        if((status = sd_cmd0()) == SD_CMD_RSP_TIMEOUT){
             return status;
         }
     }
 
     /* send cmd8, check card interface feature */
-    sdio_command_init_struct.argument = SD_CHECK_PATTERN;
-    sdio_command_init_struct.cmd_index = SDIO_SEND_IF_COND;
-    sdio_command_init_struct.rsp_type = SDIO_RESPONSE_SHORT;
-    sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
-
-    /* sdio command config */
-    sdio_command_config(SDIOx, &sdio_command_init_struct);
-    /* enable ccsm */
-    sdio_command_state_machine_enable(SDIOx, TRUE);
-
-    /* waiting R7 */
-    status = command_rsp7_error();
-
-    if (status == SD_OK)
-    {
+    if (sd_cmd8(SD_CHECK_PATTERN) == SD_OK) {
         card_info.type = SDIO_STD_CAPACITY_SD_CARD_V2_0;
         sd_type = SD_HIGH_CAPACITY;
-    }
-    else
-    {
+    } else {
         card_info.type = SDIO_STD_CAPACITY_SD_CARD_V1_1;
         sd_type = SD_STD_CAPACITY;
     }
 
-    /* send cmd55, check sd version */
-    sdio_command_init_struct.argument = 0x00;
-    sdio_command_init_struct.cmd_index = SD_CMD_APP_CMD;
-    sdio_command_init_struct.rsp_type = SDIO_RESPONSE_SHORT;
-    sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
-
-    /* sdio command config */
-    sdio_command_config(SDIOx, &sdio_command_init_struct);
-    /* enable ccsm */
-    sdio_command_state_machine_enable(SDIOx, TRUE);
-
-    /* waiting R1 */
-    status = command_rsp1_error(SD_CMD_APP_CMD);
-
     /* check sd card or mmc card */
-    if (SD_OK == status)
-    {
+    if (sd_cmd55(0) == SD_OK) {
         /* send acmd41, check voltage operation range */
-        while ((!valid_voltage) && (count < SD_MAX_VOLT_TRIAL))
-        {
-            delay_ms(10);
-
-            /* send cmd55 before acmd41 */
-            sdio_command_init_struct.argument = 0x00;
-            sdio_command_init_struct.cmd_index = SD_CMD_APP_CMD;
-            sdio_command_init_struct.rsp_type = SDIO_RESPONSE_SHORT;
-            sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
-
-            /* sdio command config */
-            sdio_command_config(SDIOx, &sdio_command_init_struct);
-            /* enable ccsm */
-            sdio_command_state_machine_enable(SDIOx, TRUE);
-
-            /* waiting R1 */
-            status = command_rsp1_error(SD_CMD_APP_CMD);
-
-            /* if any errors occured, return status */
-            if (status != SD_OK)
-            {
-                return status;
-            }
-
+        while (count < SD_MAX_VOLT_TRIAL) {
             /* send acmd41 */
-            sdio_command_init_struct.argument = SD_VOLTAGE_WINDOW_SD | sd_type;
-            sdio_command_init_struct.cmd_index = SD_CMD_SD_APP_OP_COND;
-            sdio_command_init_struct.rsp_type = SDIO_RESPONSE_SHORT;
-            sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
+            status = sd_cmd41(SD_VOLTAGE_WINDOW_SD | sd_type);
 
-            /* sdio command config */
-            sdio_command_config(SDIOx, &sdio_command_init_struct);
-            /* enable ccsm */
-            sdio_command_state_machine_enable(SDIOx, TRUE);
-
-            /* waiting R3 */
-            status = command_rsp3_error();
-
-            /* if any errors occured, return status */
-            if (status != SD_OK)
-            {
+            if (status != SD_OK) {
                 return status;
             }
 
@@ -965,60 +1152,48 @@ static sdio_error_t sd_mmc_power_on(void)
             response = sdio_response_get(SDIOx, SDIO_RSP1_INDEX);
 
             /* check sd card power on stage is success or not */
-            valid_voltage = (((response >> 31) == 1) ? 1 : 0);
+            if(response & (1 << 31)){
+                break;
+            }
+
             count++;
-        }
-
-        if (count >= SD_MAX_VOLT_TRIAL)
-        {
-            status = SD_INVALID_VOLTRANGE;
-            return status;
-        }
-
-        if (response &= SD_HIGH_CAPACITY)
-        {
-            card_info.type = SDIO_HIGH_CAPACITY_SD_CARD;
-        }
-    }
-    /* CMD55 was rejected it is a mmc card or no card present */
-    else
-    {
-        /* send cmd1 */
-        while ((!valid_voltage) && (count < SD_MAX_VOLT_TRIAL))
-        {
             delay_ms(10);
 
-            sdio_command_init_struct.argument = SD_VOLTAGE_WINDOW_MMC;
-            sdio_command_init_struct.cmd_index = SD_CMD_SEND_OP_COND;
-            sdio_command_init_struct.rsp_type = SDIO_RESPONSE_SHORT;
-            sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
+            /* send cmd55 before acmd41 */
+            if ((status = sd_cmd55(0)) != SD_OK) {
+                return status;
+            }
+        }
 
-            /* sdio command config */
-            sdio_command_config(SDIOx, &sdio_command_init_struct);
-            /* enable ccsm */
-            sdio_command_state_machine_enable(SDIOx, TRUE);
+        /* Check for Hi-Capacity card */
+        if (response & SD_HIGH_CAPACITY) {
+            card_info.type = SDIO_HIGH_CAPACITY_SD_CARD;
+        }
+    } else {
+        /* CMD55 was rejected it is a mmc card or no card present */
+        while (count < SD_MAX_VOLT_TRIAL) {
+            delay_ms(10);
+            /* send cmd1 */
+            status = sd_cmd1(SD_VOLTAGE_WINDOW_MMC);
 
-            /* waiting R3 */
-            status = command_rsp3_error();
-
-            if (status != SD_OK)
-            {
+            if (status != SD_OK) {
                 return status;
             }
 
             /* get response1 */
             response = sdio_response_get(SDIOx, SDIO_RSP1_INDEX);
 
-            valid_voltage = (((response >> 31) == 1) ? 1 : 0);
+            if(response & (1 << 31)){
+                break;
+            }
+
             count++;
         }
-
-        if (count >= SD_MAX_VOLT_TRIAL)
-        {
-            return SD_INVALID_VOLTRANGE;
-        }
-
         card_info.type = SDIO_MULTIMEDIA_CARD;
+    }
+
+    if (count >= SD_MAX_VOLT_TRIAL) {
+        return SD_INVALID_VOLTRANGE;
     }
 
     return status;
@@ -1068,7 +1243,7 @@ static sdio_error_t sd_card_init(void)
         /* enable ccsm */
         sdio_command_state_machine_enable(SDIOx, TRUE);
 
-        status = command_rsp2_error();
+        status = sd_rsp2();
         if (status != SD_OK)
         {
             return status;
@@ -1097,7 +1272,7 @@ static sdio_error_t sd_card_init(void)
         /* enable ccsm */
         sdio_command_state_machine_enable(SDIOx, TRUE);
 
-        status = command_rsp6_error(SD_CMD_SET_REL_ADDR, &rca_temp);
+        status = sd_rsp6(SD_CMD_SET_REL_ADDR, &rca_temp);
         if (status != SD_OK)
         {
             return status;
@@ -1118,7 +1293,7 @@ static sdio_error_t sd_card_init(void)
         /* enable ccsm */
         sdio_command_state_machine_enable(SDIOx, TRUE);
 
-        status = command_rsp2_error();
+        status = sd_rsp2();
         if (status != SD_OK)
         {
             return status;
@@ -1139,7 +1314,7 @@ static sdio_error_t sd_card_init(void)
         /* enable ccsm */
         sdio_command_state_machine_enable(SDIOx, TRUE);
 
-        status = command_rsp2_error();
+        status = sd_rsp2();
         if (status != SD_OK)
         {
             return status;
@@ -1244,7 +1419,7 @@ static sdio_error_t sd_deselect_select(uint32_t addr)
     /* enable ccsm */
     sdio_command_state_machine_enable(SDIOx, TRUE);
 
-    return command_rsp1_error(SD_CMD_SEL_DESEL_CARD);
+    return sd_rsp1(SD_CMD_SEL_DESEL_CARD);
 }
 
 
@@ -1314,8 +1489,6 @@ sdio_error_t sd_mmc_card_init(void)
     uint8_t retry = 3;
 
     memset(&card_info, 0, sizeof(card_info));
-
-    card_info.type = SDIO_STD_CAPACITY_SD_CARD_V1_1;
 
     while (retry--)
     {
@@ -1672,7 +1845,7 @@ sdio_error_t sd_block_erase(uint64_t addr, uint32_t nblks)
         /* enable ccsm */
         sdio_command_state_machine_enable(SDIOx, TRUE);
 
-        status = command_rsp1_error(SD_CMD_ERASE_GRP_START);
+        status = sd_rsp1(SD_CMD_ERASE_GRP_START);
 
         if (status != SD_OK)
         {
@@ -1688,7 +1861,7 @@ sdio_error_t sd_block_erase(uint64_t addr, uint32_t nblks)
         /* enable ccsm */
         sdio_command_state_machine_enable(SDIOx, TRUE);
 
-        status = command_rsp1_error(SD_CMD_ERASE_GRP_END);
+        status = sd_rsp1(SD_CMD_ERASE_GRP_END);
 
         if (status != SD_OK)
         {
@@ -1704,7 +1877,7 @@ sdio_error_t sd_block_erase(uint64_t addr, uint32_t nblks)
         /* enable ccsm */
         sdio_command_state_machine_enable(SDIOx, TRUE);
 
-        status = command_rsp1_error(SD_CMD_ERASE);
+        status = sd_rsp1(SD_CMD_ERASE);
 
         if (status != SD_OK)
         {
@@ -1724,7 +1897,7 @@ sdio_error_t sd_block_erase(uint64_t addr, uint32_t nblks)
         /* enable ccsm */
         sdio_command_state_machine_enable(SDIOx, TRUE);
 
-        status = command_rsp1_error(SD_CMD_SD_ERASE_GRP_START);
+        status = sd_rsp1(SD_CMD_SD_ERASE_GRP_START);
 
         if (status != SD_OK)
         {
@@ -1740,7 +1913,7 @@ sdio_error_t sd_block_erase(uint64_t addr, uint32_t nblks)
         /* enable ccsm */
         sdio_command_state_machine_enable(SDIOx, TRUE);
 
-        status = command_rsp1_error(SD_CMD_SD_ERASE_GRP_END);
+        status = sd_rsp1(SD_CMD_SD_ERASE_GRP_END);
 
         if (status != SD_OK)
         {
@@ -1756,7 +1929,7 @@ sdio_error_t sd_block_erase(uint64_t addr, uint32_t nblks)
         /* enable ccsm */
         sdio_command_state_machine_enable(SDIOx, TRUE);
 
-        status = command_rsp1_error(SD_CMD_ERASE);
+        status = sd_rsp1(SD_CMD_ERASE);
 
         if (status != SD_OK)
         {
@@ -1833,7 +2006,7 @@ sdio_error_t sd_block_read(uint8_t *buf, uint64_t addr, uint16_t blk_size)
     /* enable ccsm */
     sdio_command_state_machine_enable(SDIOx, TRUE);
 
-    status = command_rsp1_error(SD_CMD_SET_BLOCKLEN);
+    status = sd_rsp1(SD_CMD_SET_BLOCKLEN);
 
     if (status != SD_OK)
     {
@@ -1915,7 +2088,7 @@ sdio_error_t sd_block_multi_read(uint8_t *buf, long long addr,
         /* enable ccsm */
         sdio_command_state_machine_enable(SDIOx, TRUE);
 
-        status = command_rsp1_error(SD_CMD_SET_BLOCKLEN);
+        status = sd_rsp1(SD_CMD_SET_BLOCKLEN);
 
         if (status != SD_OK)
         {
@@ -2012,7 +2185,7 @@ sdio_error_t sd_block_write(const uint8_t *buf, long long addr,
         /* enable ccsm */
         sdio_command_state_machine_enable(SDIOx, TRUE);
 
-        status = command_rsp1_error(SD_CMD_SET_BLOCKLEN);
+        status = sd_rsp1(SD_CMD_SET_BLOCKLEN);
 
         if (status != SD_OK)
         {
@@ -2138,7 +2311,7 @@ sdio_error_t sd_block_multi_write(const uint8_t *buf, long long addr,
         /* enable ccsm */
         sdio_command_state_machine_enable(SDIOx, TRUE);
 
-        status = command_rsp1_error(SD_CMD_SET_BLOCKLEN);
+        status = sd_rsp1(SD_CMD_SET_BLOCKLEN);
 
         if (status != SD_OK)
         {
@@ -2175,17 +2348,7 @@ sdio_error_t sd_block_multi_write(const uint8_t *buf, long long addr,
         (card_info.type == SDIO_HIGH_CAPACITY_SD_CARD))
     {
         /* send cmd55 */
-        sdio_command_init_struct.argument = (uint32_t)rca << 16;
-        sdio_command_init_struct.cmd_index = SD_CMD_APP_CMD;
-        sdio_command_init_struct.rsp_type = SDIO_RESPONSE_SHORT;
-        sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
-
-        /* sdio command config */
-        sdio_command_config(SDIOx, &sdio_command_init_struct);
-        /* enable ccsm */
-        sdio_command_state_machine_enable(SDIOx, TRUE);
-
-        status = command_rsp1_error(SD_CMD_APP_CMD);
+        status = sd_cmd55((uint32_t)rca << 16);
 
         if (status != SD_OK)
         {
@@ -2203,7 +2366,7 @@ sdio_error_t sd_block_multi_write(const uint8_t *buf, long long addr,
         /* enable ccsm */
         sdio_command_state_machine_enable(SDIOx, TRUE);
 
-        status = command_rsp1_error(SD_CMD_SET_BLOCK_COUNT);
+        status = sd_rsp1(SD_CMD_SET_BLOCK_COUNT);
 
         if (status != SD_OK)
         {
@@ -2389,7 +2552,7 @@ static sdio_error_t mmc_switch(uint8_t set, uint8_t index, uint8_t value)
     /* enable ccsm */
     sdio_command_state_machine_enable(SDIOx, TRUE);
 
-    status = command_rsp1_error(SD_CMD_HS_SWITCH);
+    status = sd_rsp1(SD_CMD_HS_SWITCH);
     if (status != SD_OK)
     {
         return status;
@@ -2417,180 +2580,8 @@ static sdio_error_t mmc_switch(uint8_t set, uint8_t index, uint8_t value)
     return status;
 }
 
-/**
- * @brief  checks for error conditions for cmd0.
- * @param  none
- * @retval sdio_error_t: sd card error code.
- */
-static sdio_error_t command_error(void)
-{
-    uint32_t timeout = SDIO_CMD0TIMEOUT;
 
-    while (timeout--)
-    {
-        if (sdio_flag_get(SDIOx, SDIO_CMDCMPL_FLAG) != RESET)
-        {
-            sdio_flag_clear(SDIOx, SDIO_STATIC_FLAGS);
-            return SD_OK;
-        }
-    }
 
-    return SD_CMD_RSP_TIMEOUT;
-}
-
-/**
- * @brief  checks for error conditions for R7 response.
- * @param  none
- * @retval sdio_error_t: sd card error code.
- */
-static sdio_error_t command_rsp7_error(void)
-{
-    sdio_error_t status = SD_OK;
-    uint32_t sts_reg = 0;
-    uint32_t timeout = SDIO_CMD0TIMEOUT;
-
-    while (timeout--)
-    {
-        sts_reg = SDIOx->sts;
-
-        if (sts_reg &
-            (SDIO_CMDFAIL_FLAG | SDIO_CMDTIMEOUT_FLAG | SDIO_CMDRSPCMPL_FLAG))
-        {
-            break;
-        }
-    }
-
-    if ((timeout == 0) || (sts_reg & SDIO_CMDTIMEOUT_FLAG))
-    {
-        status = SD_CMD_RSP_TIMEOUT;
-        sdio_flag_clear(SDIOx, SDIO_CMDTIMEOUT_FLAG);
-        return status;
-    }
-
-    if (sts_reg & SDIO_CMDRSPCMPL_FLAG)
-    {
-        status = SD_OK;
-        sdio_flag_clear(SDIOx, SDIO_CMDRSPCMPL_FLAG);
-    }
-
-    return status;
-}
-
-/**
- * @brief  checks for error conditions for R1 response.
- * @param  cmd: the sent command index.
- * @retval sdio_error_t: sd card error code.
- */
-static sdio_error_t command_rsp1_error(uint8_t cmd)
-{
-    uint32_t sts_reg = 0;
-
-    while (1)
-    {
-        sts_reg = SDIOx->sts;
-
-        if (sts_reg &
-            (SDIO_CMDFAIL_FLAG | SDIO_CMDTIMEOUT_FLAG | SDIO_CMDRSPCMPL_FLAG))
-        {
-            break;
-        }
-    }
-
-    if (sdio_flag_get(SDIOx, SDIO_CMDTIMEOUT_FLAG) != RESET)
-    {
-        sdio_flag_clear(SDIOx, SDIO_CMDTIMEOUT_FLAG);
-        return SD_CMD_RSP_TIMEOUT;
-    }
-
-    if (sdio_flag_get(SDIOx, SDIO_CMDFAIL_FLAG) != RESET)
-    {
-        sdio_flag_clear(SDIOx, SDIO_CMDFAIL_FLAG);
-        return SD_CMD_FAIL;
-    }
-
-    if (sdio_command_response_get(SDIOx) != cmd)
-    {
-        return SD_ILLEGAL_CMD;
-    }
-
-    sdio_flag_clear(SDIOx, SDIO_STATIC_FLAGS);
-
-    return (sdio_error_t)(sdio_response_get(SDIOx, SDIO_RSP1_INDEX) &
-                          SD_OCR_ERRORBITS);
-}
-
-/**
- * @brief  checks for error conditions for R3 (ocr) response.
- * @param  none
- * @retval sdio_error_t: sd card error code.
- */
-static sdio_error_t command_rsp3_error(void)
-{
-    uint32_t sts_reg = 0;
-    ;
-
-    while (1)
-    {
-        sts_reg = SDIOx->sts;
-
-        if (sts_reg &
-            (SDIO_CMDFAIL_FLAG | SDIO_CMDTIMEOUT_FLAG | SDIO_CMDRSPCMPL_FLAG))
-        {
-            break;
-        }
-    }
-
-    if (sdio_flag_get(SDIOx, SDIO_CMDTIMEOUT_FLAG) != RESET)
-    {
-        sdio_flag_clear(SDIOx, SDIO_CMDTIMEOUT_FLAG);
-        return SD_CMD_RSP_TIMEOUT;
-    }
-
-    sdio_flag_clear(SDIOx, SDIO_STATIC_FLAGS);
-
-    return SD_OK;
-}
-
-/**
- * @brief  checks for error conditions for R2 (cid or csd) response.
- * @param  none
- * @retval sdio_error_t: sd card error code.
- */
-static sdio_error_t command_rsp2_error(void)
-{
-    sdio_error_t status = SD_OK;
-    uint32_t sts_reg;
-    uint32_t timeout = SDIO_CMD0TIMEOUT;
-
-    while (timeout--)
-    {
-        sts_reg = SDIOx->sts;
-
-        if (sts_reg &
-            (SDIO_CMDFAIL_FLAG | SDIO_CMDTIMEOUT_FLAG | SDIO_CMDRSPCMPL_FLAG))
-        {
-            break;
-        }
-    }
-
-    if ((timeout == 0) || sdio_flag_get(SDIOx, SDIO_CMDTIMEOUT_FLAG) != RESET)
-    {
-        status = SD_CMD_RSP_TIMEOUT;
-        sdio_flag_clear(SDIOx, SDIO_CMDTIMEOUT_FLAG);
-
-        return status;
-    }
-
-    if (sdio_flag_get(SDIOx, SDIO_CMDFAIL_FLAG) != RESET)
-    {
-        status = SD_CMD_FAIL;
-        sdio_flag_clear(SDIOx, SDIO_CMDFAIL_FLAG);
-    }
-
-    sdio_flag_clear(SDIOx, SDIO_STATIC_FLAGS);
-
-    return status;
-}
 
 #if 0 /* Not used */
 /**
@@ -2699,75 +2690,6 @@ static sdio_error_t command_rsp5_error (uint8_t cmd)
    return SD_OK;
 }
 #endif
-/**
- * @brief  checks for error conditions for r6 (rca) response.
- * @param  cmd: the sent command index.
- * @param  prca: pointer to the variable that will contain the sd card relative
- *         address rca.
- * @retval sdio_error_t: sd card error code.
- */
-static sdio_error_t command_rsp6_error(uint8_t cmd, uint16_t *prca)
-{
-    sdio_error_t status = SD_OK;
-    uint32_t sts_reg, rsp_cmd = 0, response = 0;
-
-    while (1)
-    {
-        sts_reg = SDIOx->sts;
-
-        if (sts_reg &
-            (SDIO_CMDFAIL_FLAG | SDIO_CMDTIMEOUT_FLAG | SDIO_CMDRSPCMPL_FLAG))
-        {
-            break;
-        }
-    }
-
-    if (sdio_flag_get(SDIOx, SDIO_CMDTIMEOUT_FLAG) != RESET)
-    {
-        sdio_flag_clear(SDIOx, SDIO_CMDTIMEOUT_FLAG);
-        return SD_CMD_RSP_TIMEOUT;
-    }
-
-    if (sdio_flag_get(SDIOx, SDIO_CMDFAIL_FLAG) != RESET)
-    {
-        sdio_flag_clear(SDIOx, SDIO_CMDFAIL_FLAG);
-        return SD_CMD_FAIL;
-    }
-
-    rsp_cmd = sdio_command_response_get(SDIOx);
-    if (rsp_cmd != cmd)
-    {
-        return SD_ILLEGAL_CMD;
-    }
-
-    sdio_flag_clear(SDIOx, SDIO_STATIC_FLAGS);
-
-    response = sdio_response_get(SDIOx, SDIO_RSP1_INDEX);
-
-    if (SD_ALLZERO == (response & (SD_R6_GENERAL_UNKNOWN_ERROR |
-                                   SD_R6_ILLEGAL_CMD | SD_R6_CMD_CRC_ERROR)))
-    {
-        *prca = (uint16_t)(response >> 16);
-        return status;
-    }
-
-    if (response & SD_R6_GENERAL_UNKNOWN_ERROR)
-    {
-        return SD_GENERAL_UNKNOWN_ERROR;
-    }
-
-    if (response & SD_R6_ILLEGAL_CMD)
-    {
-        return SD_ILLEGAL_CMD;
-    }
-
-    if (response & SD_R6_CMD_CRC_ERROR)
-    {
-        return SD_CMD_CRC_ERROR;
-    }
-
-    return status;
-}
 
 sdio_error_t sd_read_disk(uint8_t *buf, uint32_t sector, uint8_t cnt)
 {

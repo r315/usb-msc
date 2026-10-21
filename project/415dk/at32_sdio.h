@@ -328,15 +328,16 @@ typedef enum
   */
 typedef enum
 {
-  SDIO_STD_CAPACITY_SD_CARD_V1_1         = 0,
-  SDIO_STD_CAPACITY_SD_CARD_V2_0         = 1,
-  SDIO_HIGH_CAPACITY_SD_CARD             = 2,
-  SDIO_MULTIMEDIA_CARD                   = 3,
-  SDIO_SECURE_DIGITAL_IO_CARD            = 4,
-  SDIO_HIGH_SPEED_MULTIMEDIA_CARD        = 5,
-  SDIO_SECURE_DIGITAL_IO_COMBO_CARD      = 6,
-  SDIO_HIGH_CAPACITY_MMC_CARD            = 7,
-  SDIO_SDIO_CARD                         = 8
+    SDIO_NONE,
+    SDIO_SDIO_CARD,
+    SDIO_SECURE_DIGITAL_IO_CARD,
+    SDIO_SECURE_DIGITAL_IO_COMBO_CARD,
+    SDIO_MULTIMEDIA_CARD,
+    SDIO_STD_CAPACITY_SD_CARD_V1_1,
+    SDIO_STD_CAPACITY_SD_CARD_V2_0,
+    SDIO_HIGH_CAPACITY_SD_CARD,
+    SDIO_HIGH_CAPACITY_MMC_CARD,
+    SDIO_HIGH_SPEED_MULTIMEDIA_CARD,
 } sd_memory_card_type;
 
 
@@ -428,12 +429,12 @@ typedef struct
   */
 typedef struct
 {
-  sd_csd_struct_type csd;
-  sd_cid_struct_type cid;
+  sd_csd_struct_type csd;       /* Card specific data register */
+  sd_cid_struct_type cid;       /* Card identification number register */
   sd_scr_struct_type scr;
   uint64_t capacity;
   uint32_t block_size;
-  uint16_t rca;
+  uint32_t rca;                 /* Relative card address register */
   sd_memory_card_type type;
 } card_info_t;
 
@@ -453,9 +454,9 @@ typedef struct sdio_handle {
 /* sd exported functions ----------------------------------------*/
 sdio_error_t sd_mmc_init(void);
 sdio_error_t sd_mmc_card_init(void);
-card_info_t* sd_card_info_get(void);
+sdio_error_t sd_mmc_read(uint8_t *buf, uint64_t addr, uint16_t blk_size);
+card_info_t* sd_mmc_card_info(void);
 sdio_error_t sd_block_erase(uint64_t addr, uint32_t nblks);
-sdio_error_t sd_block_read(uint8_t *buf, uint64_t addr, uint16_t blk_size);
 sdio_error_t sd_block_multi_read(uint8_t *buf, long long addr, uint16_t blk_size, uint32_t nblks);
 sdio_error_t sd_block_write(const uint8_t *buf, long long addr, uint16_t blk_size);
 sdio_error_t sd_block_multi_write(const uint8_t *buf, long long addr, uint16_t blk_size, uint32_t nblks);

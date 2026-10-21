@@ -136,7 +136,7 @@ static int sdCardCmd(int argc, char **argv)
         return CLI_OK;
     }
 
-    sd_card_info = sd_card_info_get ();
+    sd_card_info = sd_mmc_card_info();
 
     if(!strcmp(argv[1], "info")) {
         printf("\tType: %s\n", card_types[sd_card_info->type]);
@@ -147,7 +147,7 @@ static int sdCardCmd(int argc, char **argv)
             printf("\tCapacity: %uMB\n", (unsigned int)(sd_card_info->capacity >> 20));
         }
         printf("\tBlock size: %lu bytes\n", sd_card_info->block_size);
-        printf("\tRelative card address (RCA): %u\n", sd_card_info->rca);
+        printf("\tRelative card address (RCA): %lu\n", sd_card_info->rca);
         /* SCR */
         printf("\tSCR\n");
         printf("\t\tSCR Structure: %u\n", sd_card_info->scr.scr_structure);
@@ -172,7 +172,7 @@ static int sdCardCmd(int argc, char **argv)
         uint8_t buffer[512]; // TODO: fix to use sd_card_info->block_size or specify size;
         uint32_t address;
         if(CLI_Ha2i(argv[2], &address)){
-            sdio_error_t res = sd_block_read(buffer, address << 9, sizeof(buffer));
+            sdio_error_t res = sd_mmc_read(buffer, address << 9, sizeof(buffer));
             if(res == SD_OK){
                 dump_buffer(buffer, sizeof(buffer));
             }else{

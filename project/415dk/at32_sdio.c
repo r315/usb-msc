@@ -7,13 +7,10 @@
 static sdio_error_t mmc_switch(uint8_t set, uint8_t index, uint8_t value);
 static sdio_error_t sdio_switch_speed(uint32_t mode, uint32_t group, uint8_t value, uint8_t *rsp);
 static void sd_dma_config(uint32_t *mbuf, uint32_t buf_size, dma_dir_type dir);
-static void sd_card_info_parse(card_info_t *info);
 static sdio_error_t sdio_init(sdio_handle_t *hsdio);
 
 static sdio_command_struct_type sdio_command_init_struct;
 static sdio_data_struct_type sdio_data_init_struct;
-
-static uint32_t csd_table[4], cid_table[4], rca = 0; /* csd, sid, rca */
 static sd_data_transfer_mode_type device_mode =
     SD_TRANSFER_POLLING_MODE; /* working mode */
 
@@ -167,7 +164,7 @@ static sdio_error_t sd_rsp3(void)
  *         address rca.
  * @retval sdio_error_t: sd card error code.
  */
-static sdio_error_t sd_rsp6(uint8_t cmd, uint16_t *prca)
+static sdio_error_t sd_rsp6(uint8_t cmd, uint32_t *prca)
 {
     sdio_error_t status = SD_OK;
     uint32_t sts_reg, rsp_cmd = 0, response = 0;
@@ -208,7 +205,7 @@ static sdio_error_t sd_rsp6(uint8_t cmd, uint16_t *prca)
     if (SD_ALLZERO == (response & (SD_R6_GENERAL_UNKNOWN_ERROR |
                                    SD_R6_ILLEGAL_CMD | SD_R6_CMD_CRC_ERROR)))
     {
-        *prca = (uint16_t)(response >> 16);
+        *prca = response >> 16;
         return status;
     }
 
@@ -314,6 +311,36 @@ static sdio_error_t sd_cmd1(uint32_t argument)
     return sd_rsp3();
 }
 
+static sdio_error_t sd_cmd2(uint32_t argument)
+{
+    sdio_command_struct_type sdio_cmd = {
+        .argument = argument,
+        .cmd_index = SD_CMD_ALL_SEND_CID,
+        .rsp_type = SDIO_RESPONSE_LONG,
+        .wait_type = SDIO_WAIT_FOR_NO
+    };
+
+    sd_cmdx_send(&sdio_cmd);
+
+    return sd_rsp2();
+}
+
+static sdio_error_t sd_cmd3(uint32_t argument, uint32_t *rca)
+{
+    sdio_command_struct_type sdio_cmd = {
+        .argument = argument,
+        .cmd_index = SD_CMD_SET_REL_ADDR,
+        .rsp_type = SDIO_RESPONSE_SHORT,
+        .wait_type = SDIO_WAIT_FOR_NO
+    };
+
+    sd_cmdx_send(&sdio_cmd);
+
+    return (argument != 0) ?
+        sd_rsp2() :
+        sd_rsp6(SD_CMD_SET_REL_ADDR, rca);
+}
+
 static sdio_error_t sd_cmd8(uint32_t argument)
 {
     sdio_command_struct_type sdio_cmd = {
@@ -326,6 +353,34 @@ static sdio_error_t sd_cmd8(uint32_t argument)
     sd_cmdx_send(&sdio_cmd);
 
     return sd_rsp7();
+}
+
+static sdio_error_t sd_cmd9(uint32_t argument)
+{
+    sdio_command_struct_type sdio_cmd = {
+        .argument = argument,
+        .cmd_index = SD_CMD_SEND_CSD,
+        .rsp_type = SDIO_RESPONSE_LONG,
+        .wait_type = SDIO_WAIT_FOR_NO
+    };
+
+    sd_cmdx_send(&sdio_cmd);
+
+    return sd_rsp2();
+}
+
+static sdio_error_t sd_cmd16(uint32_t argument)
+{
+    sdio_command_struct_type sdio_cmd = {
+        .argument = argument,
+        .cmd_index = SD_CMD_SET_BLOCKLEN,
+        .rsp_type = SDIO_RESPONSE_SHORT,
+        .wait_type = SDIO_WAIT_FOR_NO
+    };
+
+    sd_cmdx_send(&sdio_cmd);
+
+    return sd_rsp1(SD_CMD_SET_BLOCKLEN);
 }
 
 static sdio_error_t sd_cmd41(uint32_t argument)
@@ -881,7 +936,7 @@ static sdio_error_t sd_status_send(uint32_t *p_card_status)
         return status;
     }
 
-    sdio_command_init_struct.argument = (uint32_t)(rca << 16);
+    sdio_command_init_struct.argument = (uint32_t)(card_info.rca << 16);
     sdio_command_init_struct.cmd_index = SD_CMD_SEND_STATUS;
     sdio_command_init_struct.rsp_type = SDIO_RESPONSE_SHORT;
     sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
@@ -1033,7 +1088,7 @@ static sdio_error_t sd_programming_status(uint8_t *p_status)
     volatile uint32_t response = 0, sts_reg = 0, rsp_cmd = 0;
 
     /* send cmd13 */
-    sdio_command_init_struct.argument = (uint32_t)(rca << 16);
+    sdio_command_init_struct.argument = (uint32_t)(card_info.rca << 16);
     sdio_command_init_struct.cmd_index = SD_CMD_SEND_STATUS;
     sdio_command_init_struct.rsp_type = SDIO_RESPONSE_SHORT;
     sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
@@ -1213,109 +1268,49 @@ sdio_error_t sd_mmc_power_off(void)
 }
 
 /**
- * @brief  Intialises all SD cards or single card
- *  as the case may be card(s) come into standby state.
+ * @brief  Read necessary card information for operation
  * @param  none
  * @retval sdio_error_t: sd card error code.
  */
-static sdio_error_t sd_card_init(void)
+static sdio_error_t card_info_read(card_info_t *ci, uint32_t *table)
 {
     sdio_error_t status = SD_OK;
-    uint16_t rca_temp = 0x01;
+    uint32_t *cid_table = table;
+    uint32_t *csd_table = table + 4;
 
     /* check power status */
-    if (SDIO_POWER_OFF == sdio_power_status_get(SDIOx))
-    {
+    if (SDIO_POWER_OFF == sdio_power_status_get(SDIOx)) {
         return SD_REQ_NOT_APPLICABLE;
     }
 
-    /* check is secure_digital_io_card or not */
-    if (SDIO_SECURE_DIGITAL_IO_CARD != card_info.type)
-    {
-        /* send cmd2, get cid register */
-        sdio_command_init_struct.argument = 0x0;
-        sdio_command_init_struct.cmd_index = SD_CMD_ALL_SEND_CID;
-        sdio_command_init_struct.rsp_type = SDIO_RESPONSE_LONG;
-        sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
-
-        /* sdio command config */
-        sdio_command_config(SDIOx, &sdio_command_init_struct);
-        /* enable ccsm */
-        sdio_command_state_machine_enable(SDIOx, TRUE);
-
-        status = sd_rsp2();
-        if (status != SD_OK)
-        {
+    /* cmd2 must be issued before cmd3 */
+    if (SDIO_SECURE_DIGITAL_IO_CARD != ci->type) {
+        /* Get card identification */
+        if ((status = sd_cmd2(0)) != SD_OK) {
             return status;
         }
-
         cid_table[0] = sdio_response_get(SDIOx, SDIO_RSP1_INDEX);
         cid_table[1] = sdio_response_get(SDIOx, SDIO_RSP2_INDEX);
         cid_table[2] = sdio_response_get(SDIOx, SDIO_RSP3_INDEX);
         cid_table[3] = sdio_response_get(SDIOx, SDIO_RSP4_INDEX);
     }
 
-    /* check card type */
-    if ((card_info.type == SDIO_STD_CAPACITY_SD_CARD_V1_1) ||
-        (card_info.type == SDIO_STD_CAPACITY_SD_CARD_V2_0) ||
-        (card_info.type == SDIO_SECURE_DIGITAL_IO_COMBO_CARD) ||
-        (card_info.type == SDIO_HIGH_CAPACITY_SD_CARD))
-    {
-        /* send cmd3, get rca */
-        sdio_command_init_struct.argument = 0x00;
-        sdio_command_init_struct.cmd_index = SD_CMD_SET_REL_ADDR;
-        sdio_command_init_struct.rsp_type = SDIO_RESPONSE_SHORT;
-        sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
-
-        /* sdio command config */
-        sdio_command_config(SDIOx, &sdio_command_init_struct);
-        /* enable ccsm */
-        sdio_command_state_machine_enable(SDIOx, TRUE);
-
-        status = sd_rsp6(SD_CMD_SET_REL_ADDR, &rca_temp);
-        if (status != SD_OK)
-        {
-            return status;
-        }
+    /* Read card relative address */
+    if (SDIO_MULTIMEDIA_CARD == ci->type) {
+        /* mmc card */
+        ci->rca = 1;
+        status = sd_cmd3(1 << 16, NULL);
+    }else{
+        status = sd_cmd3(0, &ci->rca);
     }
 
-    /* mmc card */
-    if (card_info.type == SDIO_MULTIMEDIA_CARD)
-    {
-        /* send cmd3 */
-        sdio_command_init_struct.argument = (uint32_t)(rca_temp << 16);
-        sdio_command_init_struct.cmd_index = SD_CMD_SET_REL_ADDR;
-        sdio_command_init_struct.rsp_type = SDIO_RESPONSE_SHORT;
-        sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
-
-        /* sdio command config */
-        sdio_command_config(SDIOx, &sdio_command_init_struct);
-        /* enable ccsm */
-        sdio_command_state_machine_enable(SDIOx, TRUE);
-
-        status = sd_rsp2();
-        if (status != SD_OK)
-        {
-            return status;
-        }
+    if (status != SD_OK) {
+        return status;
     }
 
-    /* check is secure_digital_io_card or not */
-    if (card_info.type != SDIO_SECURE_DIGITAL_IO_CARD)
-    {
-        rca = rca_temp;
-        sdio_command_init_struct.argument = (uint32_t)(rca << 16);
-        sdio_command_init_struct.cmd_index = SD_CMD_SEND_CSD;
-        sdio_command_init_struct.rsp_type = SDIO_RESPONSE_LONG;
-        sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
-
-        /* sdio command config */
-        sdio_command_config(SDIOx, &sdio_command_init_struct);
-        /* enable ccsm */
-        sdio_command_state_machine_enable(SDIOx, TRUE);
-
-        status = sd_rsp2();
-        if (status != SD_OK)
+    if (SDIO_SECURE_DIGITAL_IO_CARD != ci->type) {
+        /* Get card specific data, requires rca */
+        if ((status = sd_cmd9(ci->rca << 16)) != SD_OK)
         {
             return status;
         }
@@ -1327,6 +1322,216 @@ static sdio_error_t sd_card_init(void)
     }
 
     return SD_OK;
+}
+
+
+/**
+ * @brief  returns information about specific card.
+ * @param  card_info: pointer to a sdio_info_t structure
+ *                    that contains will receive info.
+ *                    CSD and CID are read on sd_card_init
+ *                    and parsed here
+ * @retval none
+ */
+static void card_info_parse(card_info_t *ci, uint32_t *table)
+{
+    uint8_t tmp = 0;
+    uint32_t *cid_table = table;
+    uint32_t *csd_table = table + 4;
+
+    /* byte 0 */
+    tmp = (uint8_t)((csd_table[0] & 0xFF000000) >> 24);
+    ci->csd.csd_struct = (tmp & 0xC0) >> 6;
+    ci->csd.spec_version = (tmp & 0x3C) >> 2;
+    ci->csd.reserved1 = tmp & 0x03;
+
+    /* byte 1 */
+    tmp = (uint8_t)((csd_table[0] & 0x00FF0000) >> 16);
+    ci->csd.taac = tmp;
+
+    /* byte 2 */
+    tmp = (uint8_t)((csd_table[0] & 0x0000FF00) >> 8);
+    ci->csd.nsac = tmp;
+
+    /* byte 3 */
+    tmp = (uint8_t)(csd_table[0] & 0x000000FF);
+    ci->csd.max_bus_clk_freq = tmp;
+
+    /* byte 4 */
+    tmp = (uint8_t)((csd_table[1] & 0xFF000000) >> 24);
+    ci->csd.card_cmd_classes = tmp << 4;
+
+    /* byte 5 */
+    tmp = (uint8_t)((csd_table[1] & 0x00FF0000) >> 16);
+    ci->csd.card_cmd_classes |= (tmp & 0xF0) >> 4;
+    ci->csd.max_read_blk_length = tmp & 0x0F;
+
+    /* byte 6 */
+    tmp = (uint8_t)((csd_table[1] & 0x0000FF00) >> 8);
+    ci->csd.part_blk_read = (tmp & 0x80) >> 7;
+    ci->csd.write_blk_misalign = (tmp & 0x40) >> 6;
+    ci->csd.read_blk_misalign = (tmp & 0x20) >> 5;
+    ci->csd.dsr_implemented = (tmp & 0x10) >> 4;
+    ci->csd.reserved2 = 0; /* reserved */
+
+    if ((ci->type == SDIO_STD_CAPACITY_SD_CARD_V1_1) ||
+        (ci->type == SDIO_STD_CAPACITY_SD_CARD_V2_0) ||
+        (ci->type == SDIO_MULTIMEDIA_CARD))
+    {
+        ci->csd.device_size = (tmp & 0x03) << 10;
+
+        /* byte 7 */
+        tmp = (uint8_t)(csd_table[1] & 0x000000FF);
+        ci->csd.device_size |= (tmp) << 2;
+
+        /* byte 8 */
+        tmp = (uint8_t)((csd_table[2] & 0xFF000000) >> 24);
+        ci->csd.device_size |= (tmp & 0xC0) >> 6;
+
+        ci->csd.max_read_current_vdd_min = (tmp & 0x38) >> 3;
+        ci->csd.max_read_current_vdd_max = (tmp & 0x07);
+
+        /* byte 9 */
+        tmp = (uint8_t)((csd_table[2] & 0x00FF0000) >> 16);
+        ci->csd.max_write_current_vdd_min = (tmp & 0xE0) >> 5;
+        ci->csd.max_write_current_vdd_max = (tmp & 0x1C) >> 2;
+        ci->csd.device_size_mult = (tmp & 0x03) << 1;
+        /* byte 10 */
+        tmp = (uint8_t)((csd_table[2] & 0x0000FF00) >> 8);
+        ci->csd.device_size_mult |= (tmp & 0x80) >> 7;
+
+        ci->capacity = (ci->csd.device_size + 1);
+        ci->capacity *=
+            (1 << (ci->csd.device_size_mult + 2));
+        ci->block_size = 1
+                                << (ci->csd.max_read_blk_length);
+        ci->capacity *= ci->block_size;
+    }
+    else if (ci->type == SDIO_HIGH_CAPACITY_SD_CARD)
+    {
+        /* byte 7 */
+        tmp = (uint8_t)(csd_table[1] & 0x000000FF);
+        ci->csd.device_size = (tmp & 0x3F) << 16;
+
+        /* byte 8 */
+        tmp = (uint8_t)((csd_table[2] & 0xFF000000) >> 24);
+
+        ci->csd.device_size |= (tmp << 8);
+
+        /* byte 9 */
+        tmp = (uint8_t)((csd_table[2] & 0x00FF0000) >> 16);
+
+        ci->csd.device_size |= (tmp);
+
+        /* byte 10 */
+        tmp = (uint8_t)((csd_table[2] & 0x0000FF00) >> 8);
+
+        ci->capacity =
+            (uint64_t)(ci->csd.device_size + 1) * 512 * 1024;
+        ci->block_size = 512;
+    }
+
+    ci->csd.erase_group_size = (tmp & 0x40) >> 6;
+    ci->csd.erase_group_size_mult = (tmp & 0x3F) << 1;
+
+    /* byte 11 */
+    tmp = (uint8_t)(csd_table[2] & 0x000000FF);
+    ci->csd.erase_group_size_mult |= (tmp & 0x80) >> 7;
+    ci->csd.write_protect_group_size = (tmp & 0x7F);
+
+    /* byte 12 */
+    tmp = (uint8_t)((csd_table[3] & 0xFF000000) >> 24);
+    ci->csd.write_protect_group_enable = (tmp & 0x80) >> 7;
+    ci->csd.manufacturer_default_ecc = (tmp & 0x60) >> 5;
+    ci->csd.write_speed_factor = (tmp & 0x1C) >> 2;
+    ci->csd.max_write_blk_length = (tmp & 0x03) << 2;
+
+    /* byte 13 */
+    tmp = (uint8_t)((csd_table[3] & 0x00FF0000) >> 16);
+    ci->csd.max_write_blk_length |= (tmp & 0xC0) >> 6;
+    ci->csd.part_blk_write = (tmp & 0x20) >> 5;
+    ci->csd.reserved3 = 0;
+    ci->csd.content_protect_app = (tmp & 0x01);
+
+    /* byte 14 */
+    tmp = (uint8_t)((csd_table[3] & 0x0000FF00) >> 8);
+    ci->csd.file_format_group = (tmp & 0x80) >> 7;
+    ci->csd.copy_flag = (tmp & 0x40) >> 6;
+    ci->csd.permanent_write_protect = (tmp & 0x20) >> 5;
+    ci->csd.temp_write_protect = (tmp & 0x10) >> 4;
+    ci->csd.file_formart = (tmp & 0x0C) >> 2;
+    ci->csd.ecc_code = (tmp & 0x03);
+
+    /* byte 15 */
+    tmp = (uint8_t)(csd_table[3] & 0x000000FF);
+    ci->csd.csd_crc = (tmp & 0xFE) >> 1;
+    ci->csd.reserved4 = 1;
+
+    /* byte 0 */
+    tmp = (uint8_t)((cid_table[0] & 0xFF000000) >> 24);
+    ci->cid.manufacturer_id = tmp;
+
+    /* byte 1 */
+    tmp = (uint8_t)((cid_table[0] & 0x00FF0000) >> 16);
+    ci->cid.oem_app_id = tmp << 8;
+
+    /* byte 2 */
+    tmp = (uint8_t)((cid_table[0] & 0x000000FF00) >> 8);
+    ci->cid.oem_app_id |= tmp;
+
+    /* byte 3 */
+    tmp = (uint8_t)(cid_table[0] & 0x000000FF);
+    ci->cid.product_name1 = tmp << 24;
+
+    /* byte 4 */
+    tmp = (uint8_t)((cid_table[1] & 0xFF000000) >> 24);
+    ci->cid.product_name1 |= tmp << 16;
+
+    /* byte 5 */
+    tmp = (uint8_t)((cid_table[1] & 0x00FF0000) >> 16);
+    ci->cid.product_name1 |= tmp << 8;
+
+    /* byte 6 */
+    tmp = (uint8_t)((cid_table[1] & 0x0000FF00) >> 8);
+    ci->cid.product_name1 |= tmp;
+
+    /* byte 7 */
+    tmp = (uint8_t)(cid_table[1] & 0x000000FF);
+    ci->cid.product_name2 = tmp;
+
+    /* byte 8 */
+    tmp = (uint8_t)((cid_table[2] & 0xFF000000) >> 24);
+    ci->cid.product_reversion = tmp;
+
+    /* byte 9 */
+    tmp = (uint8_t)((cid_table[2] & 0x00FF0000) >> 16);
+    ci->cid.product_sn = tmp << 24;
+
+    /* byte 10 */
+    tmp = (uint8_t)((cid_table[2] & 0x0000FF00) >> 8);
+    ci->cid.product_sn |= tmp << 16;
+
+    /* byte 11 */
+    tmp = (uint8_t)(cid_table[2] & 0x000000FF);
+    ci->cid.product_sn |= tmp << 8;
+
+    /* byte 12 */
+    tmp = (uint8_t)((cid_table[3] & 0xFF000000) >> 24);
+    ci->cid.product_sn |= tmp;
+
+    /* byte 13 */
+    tmp = (uint8_t)((cid_table[3] & 0x00FF0000) >> 16);
+    ci->cid.reserved1 |= (tmp & 0xF0) >> 4;
+    ci->cid.manufact_date = (tmp & 0x0F) << 8;
+
+    /* byte 14 */
+    tmp = (uint8_t)((cid_table[3] & 0x0000FF00) >> 8);
+    ci->cid.manufact_date |= tmp;
+
+    /* byte 15 */
+    tmp = (uint8_t)(cid_table[3] & 0x000000FF);
+    ci->cid.cid_crc = (tmp & 0xFE) >> 1;
+    ci->cid.reserved2 = 1;
 }
 
 /**
@@ -1502,18 +1707,16 @@ sdio_error_t sd_mmc_card_init(void)
 
     if (status == SD_OK)
     {
-        status = sd_card_init();
-    }
-
-    if (status == SD_OK)
-    {
-        sd_card_info_parse(&card_info);
-    }
-
-    if ((card_info.type == SDIO_MULTIMEDIA_CARD) &&
-        (card_info.csd.spec_version >= 4))
-    {
-        card_info.type = SDIO_HIGH_SPEED_MULTIMEDIA_CARD;
+        uint32_t table[8];
+        status = card_info_read(&card_info, table);
+        if(status == SD_OK){
+            card_info_parse(&card_info, table);
+            if ((card_info.type == SDIO_MULTIMEDIA_CARD) &&
+                (card_info.csd.spec_version >= 4))
+            {
+                card_info.type = SDIO_HIGH_SPEED_MULTIMEDIA_CARD;
+            }
+        }
     }
 
     if (status == SD_OK)
@@ -1575,217 +1778,7 @@ sdio_error_t sd_mmc_card_init(void)
     return status;
 }
 
-/**
- * @brief  returns information about specific card.
- * @param  card_info: pointer to a sdio_info_t structure
- *                    that contains will receive info.
- *                    CSD and CID are read on sd_card_init
- *                    and parsed here
- * @retval none
- */
-static void sd_card_info_parse(card_info_t *card_info)
-{
-    uint8_t tmp = 0;
-
-    //card_info->type = (uint8_t)card_info.type;
-    card_info->rca = (uint16_t)rca;
-
-    /* byte 0 */
-    tmp = (uint8_t)((csd_table[0] & 0xFF000000) >> 24);
-    card_info->csd.csd_struct = (tmp & 0xC0) >> 6;
-    card_info->csd.spec_version = (tmp & 0x3C) >> 2;
-    card_info->csd.reserved1 = tmp & 0x03;
-
-    /* byte 1 */
-    tmp = (uint8_t)((csd_table[0] & 0x00FF0000) >> 16);
-    card_info->csd.taac = tmp;
-
-    /* byte 2 */
-    tmp = (uint8_t)((csd_table[0] & 0x0000FF00) >> 8);
-    card_info->csd.nsac = tmp;
-
-    /* byte 3 */
-    tmp = (uint8_t)(csd_table[0] & 0x000000FF);
-    card_info->csd.max_bus_clk_freq = tmp;
-
-    /* byte 4 */
-    tmp = (uint8_t)((csd_table[1] & 0xFF000000) >> 24);
-    card_info->csd.card_cmd_classes = tmp << 4;
-
-    /* byte 5 */
-    tmp = (uint8_t)((csd_table[1] & 0x00FF0000) >> 16);
-    card_info->csd.card_cmd_classes |= (tmp & 0xF0) >> 4;
-    card_info->csd.max_read_blk_length = tmp & 0x0F;
-
-    /* byte 6 */
-    tmp = (uint8_t)((csd_table[1] & 0x0000FF00) >> 8);
-    card_info->csd.part_blk_read = (tmp & 0x80) >> 7;
-    card_info->csd.write_blk_misalign = (tmp & 0x40) >> 6;
-    card_info->csd.read_blk_misalign = (tmp & 0x20) >> 5;
-    card_info->csd.dsr_implemented = (tmp & 0x10) >> 4;
-    card_info->csd.reserved2 = 0; /* reserved */
-
-    if ((card_info->type == SDIO_STD_CAPACITY_SD_CARD_V1_1) ||
-        (card_info->type == SDIO_STD_CAPACITY_SD_CARD_V2_0) ||
-        (card_info->type == SDIO_MULTIMEDIA_CARD))
-    {
-        card_info->csd.device_size = (tmp & 0x03) << 10;
-
-        /* byte 7 */
-        tmp = (uint8_t)(csd_table[1] & 0x000000FF);
-        card_info->csd.device_size |= (tmp) << 2;
-
-        /* byte 8 */
-        tmp = (uint8_t)((csd_table[2] & 0xFF000000) >> 24);
-        card_info->csd.device_size |= (tmp & 0xC0) >> 6;
-
-        card_info->csd.max_read_current_vdd_min = (tmp & 0x38) >> 3;
-        card_info->csd.max_read_current_vdd_max = (tmp & 0x07);
-
-        /* byte 9 */
-        tmp = (uint8_t)((csd_table[2] & 0x00FF0000) >> 16);
-        card_info->csd.max_write_current_vdd_min = (tmp & 0xE0) >> 5;
-        card_info->csd.max_write_current_vdd_max = (tmp & 0x1C) >> 2;
-        card_info->csd.device_size_mult = (tmp & 0x03) << 1;
-        /* byte 10 */
-        tmp = (uint8_t)((csd_table[2] & 0x0000FF00) >> 8);
-        card_info->csd.device_size_mult |= (tmp & 0x80) >> 7;
-
-        card_info->capacity = (card_info->csd.device_size + 1);
-        card_info->capacity *=
-            (1 << (card_info->csd.device_size_mult + 2));
-        card_info->block_size = 1
-                                << (card_info->csd.max_read_blk_length);
-        card_info->capacity *= card_info->block_size;
-    }
-    else if (card_info->type == SDIO_HIGH_CAPACITY_SD_CARD)
-    {
-        /* byte 7 */
-        tmp = (uint8_t)(csd_table[1] & 0x000000FF);
-        card_info->csd.device_size = (tmp & 0x3F) << 16;
-
-        /* byte 8 */
-        tmp = (uint8_t)((csd_table[2] & 0xFF000000) >> 24);
-
-        card_info->csd.device_size |= (tmp << 8);
-
-        /* byte 9 */
-        tmp = (uint8_t)((csd_table[2] & 0x00FF0000) >> 16);
-
-        card_info->csd.device_size |= (tmp);
-
-        /* byte 10 */
-        tmp = (uint8_t)((csd_table[2] & 0x0000FF00) >> 8);
-
-        card_info->capacity =
-            (uint64_t)(card_info->csd.device_size + 1) * 512 * 1024;
-        card_info->block_size = 512;
-    }
-
-    card_info->csd.erase_group_size = (tmp & 0x40) >> 6;
-    card_info->csd.erase_group_size_mult = (tmp & 0x3F) << 1;
-
-    /* byte 11 */
-    tmp = (uint8_t)(csd_table[2] & 0x000000FF);
-    card_info->csd.erase_group_size_mult |= (tmp & 0x80) >> 7;
-    card_info->csd.write_protect_group_size = (tmp & 0x7F);
-
-    /* byte 12 */
-    tmp = (uint8_t)((csd_table[3] & 0xFF000000) >> 24);
-    card_info->csd.write_protect_group_enable = (tmp & 0x80) >> 7;
-    card_info->csd.manufacturer_default_ecc = (tmp & 0x60) >> 5;
-    card_info->csd.write_speed_factor = (tmp & 0x1C) >> 2;
-    card_info->csd.max_write_blk_length = (tmp & 0x03) << 2;
-
-    /* byte 13 */
-    tmp = (uint8_t)((csd_table[3] & 0x00FF0000) >> 16);
-    card_info->csd.max_write_blk_length |= (tmp & 0xC0) >> 6;
-    card_info->csd.part_blk_write = (tmp & 0x20) >> 5;
-    card_info->csd.reserved3 = 0;
-    card_info->csd.content_protect_app = (tmp & 0x01);
-
-    /* byte 14 */
-    tmp = (uint8_t)((csd_table[3] & 0x0000FF00) >> 8);
-    card_info->csd.file_format_group = (tmp & 0x80) >> 7;
-    card_info->csd.copy_flag = (tmp & 0x40) >> 6;
-    card_info->csd.permanent_write_protect = (tmp & 0x20) >> 5;
-    card_info->csd.temp_write_protect = (tmp & 0x10) >> 4;
-    card_info->csd.file_formart = (tmp & 0x0C) >> 2;
-    card_info->csd.ecc_code = (tmp & 0x03);
-
-    /* byte 15 */
-    tmp = (uint8_t)(csd_table[3] & 0x000000FF);
-    card_info->csd.csd_crc = (tmp & 0xFE) >> 1;
-    card_info->csd.reserved4 = 1;
-
-    /* byte 0 */
-    tmp = (uint8_t)((cid_table[0] & 0xFF000000) >> 24);
-    card_info->cid.manufacturer_id = tmp;
-
-    /* byte 1 */
-    tmp = (uint8_t)((cid_table[0] & 0x00FF0000) >> 16);
-    card_info->cid.oem_app_id = tmp << 8;
-
-    /* byte 2 */
-    tmp = (uint8_t)((cid_table[0] & 0x000000FF00) >> 8);
-    card_info->cid.oem_app_id |= tmp;
-
-    /* byte 3 */
-    tmp = (uint8_t)(cid_table[0] & 0x000000FF);
-    card_info->cid.product_name1 = tmp << 24;
-
-    /* byte 4 */
-    tmp = (uint8_t)((cid_table[1] & 0xFF000000) >> 24);
-    card_info->cid.product_name1 |= tmp << 16;
-
-    /* byte 5 */
-    tmp = (uint8_t)((cid_table[1] & 0x00FF0000) >> 16);
-    card_info->cid.product_name1 |= tmp << 8;
-
-    /* byte 6 */
-    tmp = (uint8_t)((cid_table[1] & 0x0000FF00) >> 8);
-    card_info->cid.product_name1 |= tmp;
-
-    /* byte 7 */
-    tmp = (uint8_t)(cid_table[1] & 0x000000FF);
-    card_info->cid.product_name2 = tmp;
-
-    /* byte 8 */
-    tmp = (uint8_t)((cid_table[2] & 0xFF000000) >> 24);
-    card_info->cid.product_reversion = tmp;
-
-    /* byte 9 */
-    tmp = (uint8_t)((cid_table[2] & 0x00FF0000) >> 16);
-    card_info->cid.product_sn = tmp << 24;
-
-    /* byte 10 */
-    tmp = (uint8_t)((cid_table[2] & 0x0000FF00) >> 8);
-    card_info->cid.product_sn |= tmp << 16;
-
-    /* byte 11 */
-    tmp = (uint8_t)(cid_table[2] & 0x000000FF);
-    card_info->cid.product_sn |= tmp << 8;
-
-    /* byte 12 */
-    tmp = (uint8_t)((cid_table[3] & 0xFF000000) >> 24);
-    card_info->cid.product_sn |= tmp;
-
-    /* byte 13 */
-    tmp = (uint8_t)((cid_table[3] & 0x00FF0000) >> 16);
-    card_info->cid.reserved1 |= (tmp & 0xF0) >> 4;
-    card_info->cid.manufact_date = (tmp & 0x0F) << 8;
-
-    /* byte 14 */
-    tmp = (uint8_t)((cid_table[3] & 0x0000FF00) >> 8);
-    card_info->cid.manufact_date |= tmp;
-
-    /* byte 15 */
-    tmp = (uint8_t)(cid_table[3] & 0x000000FF);
-    card_info->cid.cid_crc = (tmp & 0xFE) >> 1;
-    card_info->cid.reserved2 = 1;
-}
-
-card_info_t *sd_card_info_get(void)
+card_info_t *sd_mmc_card_info(void)
 {
     return &card_info;
 }
@@ -1956,7 +1949,7 @@ sdio_error_t sd_block_erase(uint64_t addr, uint32_t nblks)
  * @param  blk_size: the sd card data block size.
  * @retval sdio_error_t: sd card error code.
  */
-sdio_error_t sd_block_read(uint8_t *buf, uint64_t addr, uint16_t blk_size)
+sdio_error_t sd_mmc_read(uint8_t *buf, uint64_t addr, uint16_t blk_size)
 {
     sdio_error_t status = SD_OK;
     uint32_t response = 0;
@@ -1996,17 +1989,7 @@ sdio_error_t sd_block_read(uint8_t *buf, uint64_t addr, uint16_t blk_size)
     power = convert_from_bytes_to_power_of_two(blk_size);
 
     /* send cmd16, set block size */
-    sdio_command_init_struct.argument = blk_size;
-    sdio_command_init_struct.cmd_index = SD_CMD_SET_BLOCKLEN;
-    sdio_command_init_struct.rsp_type = SDIO_RESPONSE_SHORT;
-    sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
-
-    /* sdio command config */
-    sdio_command_config(SDIOx, &sdio_command_init_struct);
-    /* enable ccsm */
-    sdio_command_state_machine_enable(SDIOx, TRUE);
-
-    status = sd_rsp1(SD_CMD_SET_BLOCKLEN);
+    status = sd_cmd16(blk_size);
 
     if (status != SD_OK)
     {
@@ -2348,7 +2331,7 @@ sdio_error_t sd_block_multi_write(const uint8_t *buf, long long addr,
         (card_info.type == SDIO_HIGH_CAPACITY_SD_CARD))
     {
         /* send cmd55 */
-        status = sd_cmd55((uint32_t)rca << 16);
+        status = sd_cmd55(card_info.rca << 16);
 
         if (status != SD_OK)
         {
@@ -2707,7 +2690,7 @@ sdio_error_t sd_read_disk(uint8_t *buf, uint32_t sector, uint8_t cnt)
 
         for (n = 0; n < cnt; n++)
         {
-            sta = sd_block_read((uint8_t *)sdio_data_buffer, lsector + block_size * n, block_size);
+            sta = sd_mmc_read((uint8_t *)sdio_data_buffer, lsector + block_size * n, block_size);
             memcpy(buf, sdio_data_buffer, block_size);
             buf += block_size;
         }
@@ -2716,7 +2699,7 @@ sdio_error_t sd_read_disk(uint8_t *buf, uint32_t sector, uint8_t cnt)
     {
         if (cnt == 1)
         {
-            sta = sd_block_read(buf, lsector, block_size);
+            sta = sd_mmc_read(buf, lsector, block_size);
         }
         else
         {

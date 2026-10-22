@@ -7,7 +7,7 @@
 #define SDIOx                            SDIO1
 //#define DMAMUX_SDIOx                     DMAMUX_DMAREQ_ID_SDIO1
 #define SDIOx_IRQHandler                 SDIO_IRQHandler
-#define SDIOx_TRANSFER_MODE              0  //SD_TRANSFER_DMA_MODE
+#define SDIOx_TRANSFER_MODE              SD_TRANSFER_POLLING_MODE  //SD_TRANSFER_DMA_MODE
 #define ALIGNED(x) __attribute__ ((aligned (x)))
 
 /**
@@ -407,6 +407,7 @@ typedef struct
 /**
   * SD Configuration Register
   * Size: 64bit
+  * Specified on Part1 Physical layer, section 5.6
   */
 typedef struct
 {
@@ -431,7 +432,7 @@ typedef struct
 {
   sd_csd_struct_type csd;       /* Card specific data register */
   sd_cid_struct_type cid;       /* Card identification number register */
-  sd_scr_struct_type scr;
+  sd_scr_struct_type scr;       /* SD Configuration register */
   uint64_t capacity;
   uint32_t block_size;
   uint32_t rca;                 /* Relative card address register */
@@ -454,7 +455,7 @@ typedef struct sdio_handle {
 /* sd exported functions ----------------------------------------*/
 sdio_error_t sd_mmc_init(void);
 sdio_error_t sd_mmc_card_init(void);
-sdio_error_t sd_mmc_read(uint8_t *buf, uint64_t addr, uint16_t blk_size);
+sdio_error_t sd_mmc_read(uint8_t *buf, uint64_t addr, uint32_t count);
 card_info_t* sd_mmc_card_info(void);
 sdio_error_t sd_block_erase(uint64_t addr, uint32_t nblks);
 sdio_error_t sd_block_multi_read(uint8_t *buf, long long addr, uint16_t blk_size, uint32_t nblks);

@@ -273,6 +273,11 @@ static void sd_cmdx_send(sdio_command_struct_type *sdio_cmd)
     sdio_command_state_machine_enable(SDIOx, TRUE);
 }
 
+/**
+ * @brief GO_IDLE_STATE
+ * @param
+ * @return
+ */
 static sdio_error_t sd_cmd0(void)
 {
     uint32_t timeout = SDIO_CMD0TIMEOUT;
@@ -297,6 +302,11 @@ static sdio_error_t sd_cmd0(void)
     return SD_CMD_RSP_TIMEOUT;
 }
 
+/**
+ * @brief SEND_OP_COND
+ * @param argument
+ * @return
+ */
 static sdio_error_t sd_cmd1(uint32_t argument)
 {
     sdio_command_struct_type sdio_cmd = {
@@ -311,6 +321,11 @@ static sdio_error_t sd_cmd1(uint32_t argument)
     return sd_rsp3();
 }
 
+/**
+ * @brief ALL_SEND_CID
+ * @param argument
+ * @return
+ */
 static sdio_error_t sd_cmd2(uint32_t argument)
 {
     sdio_command_struct_type sdio_cmd = {
@@ -325,6 +340,12 @@ static sdio_error_t sd_cmd2(uint32_t argument)
     return sd_rsp2();
 }
 
+/**
+ * @brief SEND_RELATIVE_ADDR
+ * @param argument
+ * @param rca
+ * @return
+ */
 static sdio_error_t sd_cmd3(uint32_t argument, uint32_t *rca)
 {
     sdio_command_struct_type sdio_cmd = {
@@ -341,6 +362,51 @@ static sdio_error_t sd_cmd3(uint32_t argument, uint32_t *rca)
         sd_rsp6(SD_CMD_SET_REL_ADDR, rca);
 }
 
+/**
+ * @brief SWITCH_FUNC
+ * @param argument
+ * @return
+ */
+static sdio_error_t sd_cmd6(uint32_t argument)
+{
+    sdio_command_struct_type sdio_cmd = {
+        .argument = argument,
+        .cmd_index = SD_CMD_HS_SWITCH,
+        .rsp_type = SDIO_RESPONSE_SHORT,
+        .wait_type = SDIO_WAIT_FOR_NO
+    };
+
+    sd_cmdx_send(&sdio_cmd);
+
+    return sd_rsp1(SD_CMD_HS_SWITCH);
+}
+
+/**
+ * @brief SELECT/DESELECT_CARD
+ * @param argument
+ * @return
+ */
+static sdio_error_t sd_cmd7(uint32_t argument)
+{
+    sdio_command_struct_type sdio_cmd = {
+        .argument = argument,
+        .cmd_index = SD_CMD_SEL_DESEL_CARD,
+        .rsp_type = SDIO_RESPONSE_SHORT,
+        .wait_type = SDIO_WAIT_FOR_INT
+    };
+
+    sd_cmdx_send(&sdio_cmd);
+
+    return sd_rsp1(SD_CMD_SEL_DESEL_CARD);
+}
+
+
+
+/**
+ * @brief SEND_IF_COND
+ * @param argument
+ * @return
+ */
 static sdio_error_t sd_cmd8(uint32_t argument)
 {
     sdio_command_struct_type sdio_cmd = {
@@ -355,6 +421,11 @@ static sdio_error_t sd_cmd8(uint32_t argument)
     return sd_rsp7();
 }
 
+/**
+ * @brief SEND_CSD
+ * @param argument
+ * @return
+ */
 static sdio_error_t sd_cmd9(uint32_t argument)
 {
     sdio_command_struct_type sdio_cmd = {
@@ -369,6 +440,11 @@ static sdio_error_t sd_cmd9(uint32_t argument)
     return sd_rsp2();
 }
 
+/**
+ * @brief SET_BLKLEN
+ * @param argument
+ * @return
+ */
 static sdio_error_t sd_cmd16(uint32_t argument)
 {
     sdio_command_struct_type sdio_cmd = {
@@ -381,39 +457,6 @@ static sdio_error_t sd_cmd16(uint32_t argument)
     sd_cmdx_send(&sdio_cmd);
 
     return sd_rsp1(SD_CMD_SET_BLOCKLEN);
-}
-
-static sdio_error_t sd_cmd41(uint32_t argument)
-{
-    sdio_command_struct_type sdio_cmd = {
-        .argument = argument,
-        .cmd_index = SD_CMD_SD_APP_OP_COND,
-        .rsp_type = SDIO_RESPONSE_SHORT,
-        .wait_type = SDIO_WAIT_FOR_NO
-    };
-
-    sd_cmdx_send(&sdio_cmd);
-
-    return sd_rsp3();
-}
-
-/**
- * @brief SEND SCR
- * @param argument
- * @return
- */
-static sdio_error_t sd_cmd51(uint32_t argument)
-{
-    sdio_command_struct_type sdio_cmd = {
-        .argument = argument,
-        .cmd_index = SD_CMD_SD_APP_SEND_SCR,
-        .rsp_type = SDIO_RESPONSE_SHORT,
-        .wait_type = SDIO_WAIT_FOR_NO
-    };
-
-    sd_cmdx_send(&sdio_cmd);
-
-    return sd_rsp1(SD_CMD_SD_APP_SEND_SCR);
 }
 
 /**
@@ -435,6 +478,62 @@ static sdio_error_t sd_cmd55(uint32_t argument)
     return sd_rsp1(SD_CMD_APP_CMD);
 }
 
+/**
+ * @brief SET_BUS_WIDTH
+ * @param argument
+ * @return
+ */
+static sdio_error_t sd_acmd6(uint32_t argument)
+{
+    sdio_command_struct_type sdio_cmd = {
+        .argument = argument,
+        .cmd_index = SD_CMD_APP_SD_SET_BUSWIDTH,
+        .rsp_type = SDIO_RESPONSE_SHORT,
+        .wait_type = SDIO_WAIT_FOR_NO
+    };
+
+    sd_cmdx_send(&sdio_cmd);
+
+    return sd_rsp1(SD_CMD_APP_SD_SET_BUSWIDTH);
+}
+
+/**
+ * @brief SD_APP_OP_COND
+ * @param argument
+ * @return
+ */
+static sdio_error_t sd_acmd41(uint32_t argument)
+{
+    sdio_command_struct_type sdio_cmd = {
+        .argument = argument,
+        .cmd_index = SD_CMD_SD_APP_OP_COND,
+        .rsp_type = SDIO_RESPONSE_SHORT,
+        .wait_type = SDIO_WAIT_FOR_NO
+    };
+
+    sd_cmdx_send(&sdio_cmd);
+
+    return sd_rsp3();
+}
+
+/**
+ * @brief SEND SCR
+ * @param argument
+ * @return
+ */
+static sdio_error_t sd_acmd51(uint32_t argument)
+{
+    sdio_command_struct_type sdio_cmd = {
+        .argument = argument,
+        .cmd_index = SD_CMD_SD_APP_SEND_SCR,
+        .rsp_type = SDIO_RESPONSE_SHORT,
+        .wait_type = SDIO_WAIT_FOR_NO
+    };
+
+    sd_cmdx_send(&sdio_cmd);
+
+    return sd_rsp1(SD_CMD_SD_APP_SEND_SCR);
+}
 
 /**
  * @brief  read data from or write data to sd card.
@@ -729,18 +828,8 @@ static sdio_error_t sdio_switch_speed(uint32_t mode, uint32_t group, uint8_t val
 
     blk_size = 64;
     power = convert_from_bytes_to_power_of_two(blk_size);
-
-    sdio_command_init_struct.argument = blk_size;
-    sdio_command_init_struct.cmd_index = SD_CMD_SET_BLOCKLEN;
-    sdio_command_init_struct.rsp_type = SDIO_RESPONSE_SHORT;
-    sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
-
-    /* sdio command config */
-    sdio_command_config(SDIOx, &sdio_command_init_struct);
-    /* enable ccsm */
-    sdio_command_state_machine_enable(SDIOx, TRUE);
-
-    status = sd_rsp1(SD_CMD_SET_BLOCKLEN);
+    /* Set data length */
+    status = sd_cmd16(blk_size);
 
     if (status != SD_OK)
     {
@@ -771,29 +860,9 @@ static sdio_error_t sdio_switch_speed(uint32_t mode, uint32_t group, uint8_t val
  * @param  new_state: new state of the sdio wide bus mode. (true or false)
  * @retval sdio_error_t: sd card error code.
  */
-static sdio_error_t sdio_bus_wide_enable(confirm_state new_state)
+static sdio_error_t sd_bus_wide_send(confirm_state new_state)
 {
     sdio_error_t status = SD_OK;
-    uint32_t response = 0;
-    uint8_t arg = 0x00;
-
-    if (new_state == TRUE)
-    {
-        arg = 0x02;
-    }
-    else
-    {
-        arg = 0x00;
-    }
-
-    /* get response1 */
-    response = sdio_response_get(SDIOx, SDIO_RSP1_INDEX);
-
-    /* check card locked or not */
-    if (response & SD_CARD_LOCKED)
-    {
-        return SD_LOCK_UNLOCK_ERROR;
-    }
 
     if (card_info.scr.sd_bus_widths)
     {
@@ -804,23 +873,11 @@ static sdio_error_t sdio_bus_wide_enable(confirm_state new_state)
             return status;
         }
 
-        sdio_command_init_struct.argument = arg;
-        sdio_command_init_struct.cmd_index = SD_CMD_APP_SD_SET_BUSWIDTH;
-        sdio_command_init_struct.rsp_type = SDIO_RESPONSE_SHORT;
-        sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
-
-        /* sdio command config */
-        sdio_command_config(SDIOx, &sdio_command_init_struct);
-        /* enable ccsm */
-        sdio_command_state_machine_enable(SDIOx, TRUE);
-
-        status = sd_rsp1(SD_CMD_APP_SD_SET_BUSWIDTH);
+        status = sd_acmd6((new_state == TRUE) ? 0x02 : 0x00);
         return status;
     }
-    else
-    {
-        return SD_REQ_NOT_APPLICABLE;
-    }
+
+    return SD_REQ_NOT_APPLICABLE;
 }
 
 /**
@@ -1036,8 +1093,8 @@ static sdio_error_t sd_scr_read(uint32_t *buffer)
     sdio_data_config(SDIOx, &sdio_data_init_struct);
     sdio_data_state_machine_enable(SDIOx, TRUE);
 
-    /* send cmd51, read scr */
-    status = sd_cmd51(0);
+    /* send acmd51, read scr */
+    status = sd_acmd51(0);
     if (status != SD_OK)
     {
         return status;
@@ -1203,7 +1260,7 @@ static sdio_error_t sd_mmc_power_on(void)
         /* send acmd41, check voltage operation range */
         while (count < SD_MAX_VOLT_TRIAL) {
             /* send acmd41 */
-            status = sd_cmd41(SD_VOLTAGE_WINDOW_SD | sd_type);
+            status = sd_acmd41(SD_VOLTAGE_WINDOW_SD | sd_type);
 
             if (status != SD_OK) {
                 return status;
@@ -1550,9 +1607,21 @@ static void card_info_parse(card_info_t *ci, uint32_t *table)
  *     @arg SDIO_BUS_WIDTH_D1: 1-bit data transfer
  * @retval sdio_error_t: sd card error code.
  */
-static sdio_error_t sd_wide_bus_operation_config(sdio_bus_width_type mode)
+static sdio_error_t sd_bus_wide_operation_config(sdio_bus_width_type mode)
 {
     sdio_error_t status = SD_OK;
+
+    if (mode >= SDIO_BUS_WIDTH_D8)
+    {
+        /* not support D8 mode */
+        return SD_UNSUPPORTED_FEATURE;
+    }
+
+    /* get last R1 to check if card locked or not */
+    if (sdio_response_get(SDIOx, SDIO_RSP1_INDEX) & SD_CARD_LOCKED)
+    {
+        return SD_LOCK_UNLOCK_ERROR;
+    }
 
     if ((card_info.type == SDIO_MULTIMEDIA_CARD) ||
         (card_info.type == SDIO_HIGH_SPEED_MULTIMEDIA_CARD))
@@ -1564,52 +1633,18 @@ static sdio_error_t sd_wide_bus_operation_config(sdio_bus_width_type mode)
              (card_info.type == SDIO_STD_CAPACITY_SD_CARD_V2_0) ||
              (card_info.type == SDIO_HIGH_CAPACITY_SD_CARD))
     {
-        if (mode >= 2)
-        {
-            /* not support D8 mode */
-            return SD_UNSUPPORTED_FEATURE;
-        }
-
-        if (SDIO_BUS_WIDTH_D4 == mode)
-        {
-            status = sdio_bus_wide_enable(TRUE);
-        }
-        else
-        {
-            status = sdio_bus_wide_enable(FALSE);
-        }
+        /* Configure card */
+        status = sd_bus_wide_send((SDIO_BUS_WIDTH_D4 == mode) ? TRUE : FALSE);
     }
 
     if (status == SD_OK)
     {
+        /* Configure interface */
         sdio_bus_width_config(SDIOx, mode);
     }
 
     return status;
 }
-
-/**
- * @brief  selects or deselects the corresponding card.
- * @param  addr: address of the card to be selected.
- * @retval sdio_error_t: sd card error code.
- */
-static sdio_error_t sd_deselect_select(uint32_t addr)
-{
-    /* send cmd7, select card */
-    sdio_command_init_struct.argument = addr;
-    sdio_command_init_struct.cmd_index = SD_CMD_SEL_DESEL_CARD;
-    sdio_command_init_struct.rsp_type = SDIO_RESPONSE_SHORT;
-    sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_INT;
-
-    /* sdio command config */
-    sdio_command_config(SDIOx, &sdio_command_init_struct);
-    /* enable ccsm */
-    sdio_command_state_machine_enable(SDIOx, TRUE);
-
-    return sd_rsp1(SD_CMD_SEL_DESEL_CARD);
-}
-
-
 
 /**
  * @brief Initializes sdio peripheral,
@@ -1704,7 +1739,7 @@ sdio_error_t sd_mmc_card_init(void)
     if (status == SD_OK)
     {
         /* select card */
-        status = sd_deselect_select((uint32_t)(card_info.rca << 16));
+        status = sd_cmd7((uint32_t)(card_info.rca << 16));
     }
 
     if (status == SD_OK && ((SDIO_STD_CAPACITY_SD_CARD_V1_1 == card_info.type) ||
@@ -1924,30 +1959,41 @@ sdio_error_t sd_block_erase(uint64_t addr, uint32_t nblks)
 }
 
 /**
- * @brief  allows to read one block from a specified address in a card. the data
- *         transfer can be managed by dma mode or polling mode.
+ * @brief  Read one block of data from a specified address.
+ *         Data transfer can be managed by dma mode or polling mode.
+ *         for now block size is fixed to 512bytes
+ *
  * @param  buf: pointer to the buffer that will contain the received data
- * @param  addr: address from where data are to be read.
- * @param  blk_size: the sd card data block size.
+ * @param  block: For V1.1 this is offset in bytes, otherwise is block number
+ *
+ * @param  count: Number of blocks,
+ *               for now only one block is allowed
  * @retval sdio_error_t: sd card error code.
  */
-sdio_error_t sd_mmc_read(uint8_t *buf, uint64_t addr, uint16_t blk_size)
+sdio_error_t sd_mmc_read(uint8_t *buf, uint64_t block, uint32_t count)
 {
     sdio_error_t status = SD_OK;
     uint32_t response = 0;
     uint8_t power;
+    uint16_t blk_size;
 
-    if ((NULL == buf) || (blk_size == 0) || (blk_size > 2048) || ((blk_size & (blk_size - 1))))
+    if ((NULL == buf) || (count != 1))  // || count > card_info.last_block
     {
         return SD_INVALID_PARAMETER;
     }
 
     SDIOx->dtctrl = 0x0;
 
-    if (card_info.type == SDIO_HIGH_CAPACITY_SD_CARD)
-    {
-        blk_size = 512;
-        addr >>= 9;
+    /* Clip to 512 bytes */
+    blk_size = (card_info.block_size  > 512) ? 512 : card_info.block_size;
+
+    if(card_info.type != SDIO_HIGH_CAPACITY_SD_CARD){
+        /* send cmd16 to set block size */
+        if ((status = sd_cmd16(blk_size)) != SD_OK)
+        {
+            return status;
+        }
+        block <<= 9;
     }
 
     /* clear dcsm configuration */
@@ -1956,35 +2002,24 @@ sdio_error_t sd_mmc_read(uint8_t *buf, uint64_t addr, uint16_t blk_size)
     sdio_data_init_struct.timeout = SD_DATATIMEOUT;
     sdio_data_init_struct.transfer_direction = SDIO_DATA_TRANSFER_TO_CARD;
     sdio_data_init_struct.transfer_mode = SDIO_DATA_BLOCK_TRANSFER;
-
     sdio_data_config(SDIOx, &sdio_data_init_struct);
     sdio_data_state_machine_enable(SDIOx, FALSE);
-
-    response = sdio_response_get(SDIOx, SDIO_RSP1_INDEX);
-
     /* check card locked */
+    response = sdio_response_get(SDIOx, SDIO_RSP1_INDEX);
     if (response & SD_CARD_LOCKED)
     {
         return SD_LOCK_UNLOCK_ERROR;
     }
 
     power = convert_from_bytes_to_power_of_two(blk_size);
-
-    /* send cmd16, set block size */
-    status = sd_cmd16(blk_size);
-
-    if (status != SD_OK)
-    {
-        return status;
-    }
-
     sdio_data_init_struct.block_size = (sdio_block_size_type)(power);
-    sdio_data_init_struct.data_length = blk_size;
+    sdio_data_init_struct.data_length = count << power;
     sdio_data_init_struct.timeout = SD_DATATIMEOUT;
     sdio_data_init_struct.transfer_direction = SDIO_DATA_TRANSFER_TO_CONTROLLER;
     sdio_data_init_struct.transfer_mode = SDIO_DATA_BLOCK_TRANSFER;
 
-    sdio_command_init_struct.argument = addr;
+    /* send cmd17 for single block */
+    sdio_command_init_struct.argument = block;
     sdio_command_init_struct.cmd_index = SD_CMD_READ_SINGLE_BLOCK;
     sdio_command_init_struct.rsp_type = SDIO_RESPONSE_SHORT;
     sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
@@ -2383,7 +2418,11 @@ sdio_error_t sd_block_multi_write(const uint8_t *buf, long long addr,
  */
 sdio_error_t mmc_stream_read(uint8_t *buf, long long addr, uint32_t len)
 {
-    uint32_t response = 0;
+    /* check card locked */
+    if (sdio_response_get(SDIOx, SDIO_RSP1_INDEX) & SD_CARD_LOCKED)
+    {
+        return SD_LOCK_UNLOCK_ERROR;
+    }
 
     SDIOx->dtctrl = 0x0;
 
@@ -2397,13 +2436,6 @@ sdio_error_t mmc_stream_read(uint8_t *buf, long long addr, uint32_t len)
     sdio_data_config(SDIOx, &sdio_data_init_struct);
     sdio_data_state_machine_enable(SDIOx, FALSE);
 
-    response = sdio_response_get(SDIOx, SDIO_RSP1_INDEX);
-
-    /* check card locked */
-    if (response & SD_CARD_LOCKED)
-    {
-        return SD_LOCK_UNLOCK_ERROR;
-    }
     /* send cmd11, read data */
     sdio_command_init_struct.argument = addr;
     sdio_command_init_struct.cmd_index = SD_CMD_READ_DAT_UNTIL_STOP;
@@ -2506,18 +2538,10 @@ static sdio_error_t mmc_switch(uint8_t set, uint8_t index, uint8_t value)
     sdio_error_t status = SD_OK;
     uint32_t card_status = 0, timeout = 0;
 
-    sdio_command_init_struct.argument =
+    uint32_t argument =
         (EXT_CSD_Write_byte << 24) | (index << 16) | (value << 8) | set;
-    sdio_command_init_struct.cmd_index = SD_CMD_HS_SWITCH;
-    sdio_command_init_struct.rsp_type = SDIO_RESPONSE_SHORT;
-    sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
 
-    /* sdio command config */
-    sdio_command_config(SDIOx, &sdio_command_init_struct);
-    /* enable ccsm */
-    sdio_command_state_machine_enable(SDIOx, TRUE);
-
-    status = sd_rsp1(SD_CMD_HS_SWITCH);
+    status = sd_cmd6(argument);
     if (status != SD_OK)
     {
         return status;

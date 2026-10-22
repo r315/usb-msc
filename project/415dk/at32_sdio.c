@@ -539,8 +539,8 @@ static sdio_error_t sd_acmd51(uint32_t argument)
  * @param  buf: pointer to data buffer read or write.
  * @retval sdio_error_t: sd card error code.
  */
-static sdio_error_t sdio_command_data_send(sdio_command_struct_type *sdio_cmd_init_t,
-                                           sdio_data_struct_type *sdio_data_init_t,
+static sdio_error_t sdio_command_data_send(sdio_command_struct_type *sdio_cmd,
+                                           sdio_data_struct_type *sdio_data,
                                            uint32_t *buf)
 {
     sdio_error_t status = SD_OK;
@@ -548,23 +548,17 @@ static sdio_error_t sdio_command_data_send(sdio_command_struct_type *sdio_cmd_in
     uint32_t timeout = SDIO_DATATIMEOUT;
     uint32_t length = 0;
 
-    if (buf == NULL)
-    {
-        return SD_INVALID_PARAMETER;
-    }
-    /* clear dtctrl register */
+    /* reset data control register */
     SDIOx->dtcnt = 0x0;
-
-    /* sdio command config */
-    sdio_data_config(SDIOx, sdio_data_init_t);
-    /* enable dcsm */
+    /* enable data path */
+    sdio_data_config(SDIOx, sdio_data);
     sdio_data_state_machine_enable(SDIOx, TRUE);
 
-    length = sdio_data_init_t->data_length;
+    length = sdio_data->data_length;
 
-    if (device_mode == SD_TRANSFER_DMA_MODE)
+    if (SD_TRANSFER_DMA_MODE == sdio_handle.device_mode)
     {
-        if (sdio_data_init_t->transfer_direction ==
+        if (sdio_data->transfer_direction ==
             SDIO_DATA_TRANSFER_TO_CONTROLLER)
         {
             sd_dma_config(buf, length, DMA_DIR_PERIPHERAL_TO_MEMORY);
@@ -575,26 +569,24 @@ static sdio_error_t sdio_command_data_send(sdio_command_struct_type *sdio_cmd_in
         }
     }
 
-    /* sdio command config */
-    sdio_command_config(SDIOx, sdio_cmd_init_t);
-    /* enable ccsm */
+    /* send sd command */
+    sdio_command_config(SDIOx, sdio_cmd);
     sdio_command_state_machine_enable(SDIOx, TRUE);
-
-    status = sd_rsp1(sdio_cmd_init_t->cmd_index);
+    status = sd_rsp1(sdio_cmd->cmd_index);
     if (status != SD_OK)
     {
         return status;
     }
 
     /* polling mode */
-    if (device_mode == SD_TRANSFER_POLLING_MODE)
+    if (SD_TRANSFER_POLLING_MODE == sdio_handle.device_mode)
     {
-        if (SDIO_DATA_TRANSFER_TO_CONTROLLER ==
-            sdio_data_init_t->transfer_direction)
+        if (SDIO_DATA_TRANSFER_TO_CONTROLLER == sdio_data->transfer_direction)
         {
+            /* Read data */
             while (!(SDIOx->sts & (SDIO_INTR_STS_READ_MASK)))
             {
-                if (sdio_flag_get(SDIOx, SDIO_RXBUFH_FLAG) != RESET)
+                if (sdio_flag_get(SDIOx, SDIO_RXBUFH_FLAG))
                 {
                     for (count = 0; count < 8; count++, buf++)
                     {
@@ -622,6 +614,7 @@ static sdio_error_t sdio_command_data_send(sdio_command_struct_type *sdio_cmd_in
         }
         else
         {
+            /* Write data */
             while (!(SDIOx->sts & SDIO_INTR_STS_WRITE_MASK))
             {
                 if (sdio_flag_get(SDIOx, SDIO_TXBUFH_FLAG) != RESET)
@@ -680,13 +673,13 @@ static sdio_error_t sdio_command_data_send(sdio_command_struct_type *sdio_cmd_in
             (sdio_flag_get(SDIOx, SDIO_DTCMPL_FLAG) != RESET))
         {
             /* send cmd12, stop transmission */
-            sdio_cmd_init_t->argument = 0;
-            sdio_cmd_init_t->cmd_index = SD_CMD_STOP_TRANSMISSION;
-            sdio_cmd_init_t->rsp_type = SDIO_RESPONSE_SHORT;
-            sdio_cmd_init_t->wait_type = SDIO_WAIT_FOR_NO;
+            sdio_cmd->argument = 0;
+            sdio_cmd->cmd_index = SD_CMD_STOP_TRANSMISSION;
+            sdio_cmd->rsp_type = SDIO_RESPONSE_SHORT;
+            sdio_cmd->wait_type = SDIO_WAIT_FOR_NO;
 
             /* sdio command config */
-            sdio_command_config(SDIOx, sdio_cmd_init_t);
+            sdio_command_config(SDIOx, sdio_cmd);
             /* enable ccsm */
             sdio_command_state_machine_enable(SDIOx, TRUE);
 
@@ -700,9 +693,9 @@ static sdio_error_t sdio_command_data_send(sdio_command_struct_type *sdio_cmd_in
 
         sdio_flag_clear(SDIOx, SDIO_STATIC_FLAGS);
     }
-    else if (device_mode == SD_TRANSFER_DMA_MODE)
+    else if (SD_TRANSFER_DMA_MODE == sdio_handle.device_mode)
     {
-        if (sdio_data_init_t->transfer_direction == SDIO_DATA_TRANSFER_TO_CARD)
+        if (sdio_data->transfer_direction == SDIO_DATA_TRANSFER_TO_CARD)
         {
             sd_dma_config(buf, length, DMA_DIR_MEMORY_TO_PERIPHERAL);
             SDIOx->inten |= SDIO_INTR_STS_WRITE_MASK;
@@ -1750,15 +1743,12 @@ sdio_error_t sd_mmc_card_init(void)
         }
         /* set sdio clock divider */
         sdio_clock_config(SDIOx, clkdiv, SDIO_CLOCK_EDGE_FALLING);
-
-        /* set transfer mode */
-        device_mode = SDIOx_TRANSFER_MODE;
     }
 
     if (status == SD_OK)
     {
         /* Set data width */
-        status = sd_wide_bus_operation_config(SDIO_BUS_WIDTH_D4);
+        status = sd_bus_wide_operation_config(SDIO_BUS_WIDTH_D4);
     }
 
     return status;

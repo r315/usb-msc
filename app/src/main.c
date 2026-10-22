@@ -126,8 +126,9 @@ static int sdCardCmd(int argc, char **argv)
         printf("usage: sd <init | info | rb | eb>\n");
         printf("  init       card initialization\n");
         printf("  info       basic card information\n");
-        printf("  rb <nr>    read block\n");
-        printf("  eb <nr>    erase block\n");
+        printf("  rb <n>     read block, hex\n");
+        printf("  eb <n> <c> erase block, hex\n");
+        printf("  st         Card status\n");
         return CLI_OK_LF;
     }
 
@@ -142,7 +143,8 @@ static int sdCardCmd(int argc, char **argv)
         printf("\tType: %s\n", card_types[sd_card_info->type]);
         printf("\tCapacity: %uMiB\n", (unsigned int)(sd_card_info->capacity >> 20));
         printf("\tBlock size: %lu bytes\n", sd_card_info->block_size);
-        printf("\tTotal blocks: %lu\n", (uint32_t)(sd_card_info->capacity >> power_of_two(sd_card_info->block_size)));
+        uint32_t tblocks = (uint32_t)(sd_card_info->capacity >> power_of_two(sd_card_info->block_size));
+        printf("\tTotal blocks: %lu (0x%08x)\n", tblocks, tblocks);
         printf("\tRelative card address (RCA): %lu\n", sd_card_info->rca);
         /* SCR */
         printf("\tSCR\n");
@@ -184,15 +186,25 @@ static int sdCardCmd(int argc, char **argv)
     }
 
     if(!strcmp(argv[1], "eb")) {
-        uint32_t address;
-        if(CLI_Ha2i(argv[2], &address)){
-            sdio_error_t res = sd_block_erase(address << 9, 1);
-            if(res != SD_OK){
-                printf("\tFail: %s\n", sd_errors[res]);
+        uint32_t block, count;
+        if(CLI_Ha2i(argv[2], &block)){
+            if(CLI_Ha2i(argv[3], &count)){
+                sdio_error_t res = sd_mmc_erase(block, count);
+                if(res != SD_OK){
+                    printf("\tFail: %s\n", sd_errors[res]);
+                }
+                return CLI_OK;
             }
-            return CLI_OK;
         }
     }
+
+    if(!strcmp(argv[1], "st")) {
+        uint32_t status;
+        sd_mmc_status_read(&status);
+        printf("Card status: %lu\n", status);
+        return CLI_OK;
+    }
+
 
     return CLI_BAD_PARAM;
 }

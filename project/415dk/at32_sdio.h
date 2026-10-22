@@ -50,10 +50,10 @@
 #define SD_CMD_SET_WRITE_PROT            ((uint8_t)28)
 #define SD_CMD_CLR_WRITE_PROT            ((uint8_t)29)
 #define SD_CMD_SEND_WRITE_PROT           ((uint8_t)30)
-#define SD_CMD_SD_ERASE_GRP_START        ((uint8_t)32)
-#define SD_CMD_SD_ERASE_GRP_END          ((uint8_t)33)
-#define SD_CMD_ERASE_GRP_START           ((uint8_t)35)
-#define SD_CMD_ERASE_GRP_END             ((uint8_t)36)
+#define SD_CMD_ERASE_WR_BLK_START        ((uint8_t)32)
+#define SD_CMD_ERASE_WR_BLK_END          ((uint8_t)33)
+#define SD_CMD_ERASE_GROUP_START         ((uint8_t)35)
+#define SD_CMD_ERASE_GROUP_END           ((uint8_t)36)
 #define SD_CMD_ERASE                     ((uint8_t)38)
 #define SD_CMD_FAST_IO                   ((uint8_t)39)
 #define SD_CMD_GO_IRQ_STATE              ((uint8_t)40)
@@ -442,6 +442,7 @@ typedef struct
 typedef struct sdio_handle {
     sdio_type *sdio_x;
     uint32_t clock_frequency;
+    sd_data_transfer_mode_type device_mode;
 }sdio_handle_t;
 
 /**
@@ -455,9 +456,9 @@ typedef struct sdio_handle {
 /* sd exported functions ----------------------------------------*/
 sdio_error_t sd_mmc_init(void);
 sdio_error_t sd_mmc_card_init(void);
-sdio_error_t sd_mmc_read(uint8_t *buf, uint64_t addr, uint32_t count);
 card_info_t* sd_mmc_card_info(void);
-sdio_error_t sd_block_erase(uint64_t addr, uint32_t nblks);
+sdio_error_t sd_mmc_read(uint8_t *buf, uint64_t addr, uint32_t count);
+sdio_error_t sd_mmc_erase(uint64_t addr, uint32_t nblks);
 sdio_error_t sd_block_multi_read(uint8_t *buf, long long addr, uint16_t blk_size, uint32_t nblks);
 sdio_error_t sd_block_write(const uint8_t *buf, long long addr, uint16_t blk_size);
 sdio_error_t sd_block_multi_write(const uint8_t *buf, long long addr, uint16_t blk_size, uint32_t nblks);
@@ -465,7 +466,8 @@ sdio_error_t sd_read_disk(uint8_t *buf, uint32_t sector, uint8_t cnt);
 sdio_error_t sd_write_disk(const uint8_t *buf, uint32_t sector, uint8_t cnt);
 sdio_error_t mmc_stream_read(uint8_t *buf, long long addr, uint32_t len);
 sdio_error_t mmc_stream_write(uint8_t *buf, long long addr, uint32_t len);
-sd_card_state_type sd_state_get(void);
+
+sdio_error_t sd_mmc_status_read(uint32_t *status);
 
 uint8_t power_of_two(uint16_t number_of_bytes);
 #endif /* __AT32_SDIO_H */

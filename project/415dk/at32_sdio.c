@@ -7,12 +7,9 @@
 static sdio_error_t mmc_switch(uint8_t set, uint8_t index, uint8_t value);
 static sdio_error_t sdio_switch_speed(uint32_t mode, uint32_t group, uint8_t value, uint8_t *rsp);
 static void sd_dma_config(uint32_t *mbuf, uint32_t buf_size, dma_dir_type dir);
-static sdio_error_t sdio_init(sdio_handle_t *hsdio);
 
 static sdio_command_struct_type sdio_command_init_struct;
 static sdio_data_struct_type sdio_data_init_struct;
-static sd_data_transfer_mode_type device_mode =
-    SD_TRANSFER_POLLING_MODE; /* working mode */
 
 static uint8_t stop_flag = 0;                 /* transmit stop flag */
 volatile sdio_error_t transfer_error = SD_OK; /* transmit error flag */
@@ -1007,55 +1004,28 @@ static void sd_dma_config(uint32_t *mbuf, uint32_t buf_size, dma_dir_type dir)
  * @param  p_card_status: card status.
  * @retval sdio_error_t: sd card error code.
  */
-static sdio_error_t sd_status_send(uint32_t *p_card_status)
+sdio_error_t sd_mmc_status_read(uint32_t *p_card_status)
 {
-    sdio_error_t status = SD_OK;
+    sdio_error_t status;
 
-    if (p_card_status == NULL)
-    {
-        status = SD_INVALID_PARAMETER;
-        return status;
+    if (p_card_status == NULL) {
+        return SD_INVALID_PARAMETER;
     }
 
+    /* cmd13 SEND_STATUS */
     sdio_command_init_struct.argument = (uint32_t)(card_info.rca << 16);
     sdio_command_init_struct.cmd_index = SD_CMD_SEND_STATUS;
     sdio_command_init_struct.rsp_type = SDIO_RESPONSE_SHORT;
     sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
-
-    /* sdio command config */
     sdio_command_config(SDIOx, &sdio_command_init_struct);
-    /* enable ccsm */
     sdio_command_state_machine_enable(SDIOx, TRUE);
-
     status = sd_rsp1(SD_CMD_SEND_STATUS);
 
-    if (status != SD_OK)
-    {
-        return status;
+    if (status == SD_OK) {
+        *p_card_status = sdio_response_get(SDIOx, SDIO_RSP1_INDEX);
     }
-
-    *p_card_status = sdio_response_get(SDIOx, SDIO_RSP1_INDEX);
 
     return status;
-}
-
-/**
- * @brief  returns information about sd card.
- * @param  none.
- * @retval sd_card_state_type: sd card state code.
- */
-sd_card_state_type sd_state_get(void)
-{
-    uint32_t response = 0;
-
-    if (sd_status_send(&response) != SD_OK)
-    {
-        return SD_CARD_ERROR;
-    }
-    else
-    {
-        return (sd_card_state_type)((response >> 9) & 0x0F);
-    }
 }
 
 /**
@@ -1155,10 +1125,7 @@ static sdio_error_t sd_programming_status(uint8_t *p_status)
     sdio_command_init_struct.cmd_index = SD_CMD_SEND_STATUS;
     sdio_command_init_struct.rsp_type = SDIO_RESPONSE_SHORT;
     sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
-
-    /* sdio command config */
     sdio_command_config(SDIOx, &sdio_command_init_struct);
-    /* enable ccsm */
     sdio_command_state_machine_enable(SDIOx, TRUE);
 
     sts_reg = SDIOx->sts;
@@ -1750,6 +1717,8 @@ sdio_error_t sd_mmc_card_init(void)
         status = sd_scr_read((uint32_t *)&card_info.scr);
     }
 
+    /* set transfer mode */
+    sdio_handle.device_mode = SDIOx_TRANSFER_MODE;
     if (status == SD_OK)
     {
         /* set normal speed */
@@ -2202,7 +2171,7 @@ sdio_error_t sd_block_write(const uint8_t *buf, long long addr,
     do
     {
         timeout--;
-        status = sd_status_send(&card_status);
+        status = sd_mmc_status_read(&card_status);
     }
     /* check ready_for_data flag */
     while (((card_status & 0x00000100) == 0) && (timeout > 0));
@@ -2333,7 +2302,7 @@ sdio_error_t sd_block_multi_write(const uint8_t *buf, long long addr,
     do
     {
         timeout--;
-        status = sd_status_send(&card_status);
+        status = sd_mmc_status_read(&card_status);
     }
     /* check ready_for_data flag */
     while (((card_status & 0x00000100) == 0) && (timeout > 0));
@@ -2557,7 +2526,7 @@ static sdio_error_t mmc_switch(uint8_t set, uint8_t index, uint8_t value)
     do
     {
         timeout--;
-        status = sd_status_send(&card_status);
+        status = sd_mmc_status_read(&card_status);
     } /* check ready_for_data flag */
     while (((card_status & 0x00000100) == 0) && (timeout > 0));
 

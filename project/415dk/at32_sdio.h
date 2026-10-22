@@ -467,5 +467,6 @@ sdio_error_t mmc_stream_read(uint8_t *buf, long long addr, uint32_t len);
 sdio_error_t mmc_stream_write(uint8_t *buf, long long addr, uint32_t len);
 sd_card_state_type sd_state_get(void);
 
+uint8_t power_of_two(uint16_t number_of_bytes);
 #endif /* __AT32_SDIO_H */
 

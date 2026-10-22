@@ -140,13 +140,9 @@ static int sdCardCmd(int argc, char **argv)
 
     if(!strcmp(argv[1], "info")) {
         printf("\tType: %s\n", card_types[sd_card_info->type]);
-
-        if(sd_card_info->capacity < (1024 * 1024 * 1024)){
-            printf("\tCapacity: %u bytes\n", (unsigned int)sd_card_info->capacity);
-        }else{
-            printf("\tCapacity: %uMB\n", (unsigned int)(sd_card_info->capacity >> 20));
-        }
+        printf("\tCapacity: %uMiB\n", (unsigned int)(sd_card_info->capacity >> 20));
         printf("\tBlock size: %lu bytes\n", sd_card_info->block_size);
+        printf("\tTotal blocks: %lu\n", (uint32_t)(sd_card_info->capacity >> power_of_two(sd_card_info->block_size)));
         printf("\tRelative card address (RCA): %lu\n", sd_card_info->rca);
         /* SCR */
         printf("\tSCR\n");
@@ -160,19 +156,24 @@ static int sdCardCmd(int argc, char **argv)
         printf("\t\tV4 Spec: %u\n", sd_card_info->scr.sd_spec4);
         printf("\t\tVX Spec: %u\n", sd_card_info->scr.sd_specx);
         printf("\t\tCMD Support : %u\n", sd_card_info->scr.cmd_support);
-
+        /* CSD */
         printf("\tCSD\n");
-        printf("\t\tCSD Structure: %u\n", sd_card_info->csd.csd_struct);
-        printf("\t\tWR Protection: %u\n", sd_card_info->csd.permanent_write_protect);
+        printf("\t\tCSD_STRUCTURE: %u\n", sd_card_info->csd.csd_struct);
+        printf("\t\tPERM_WRITE_PROTECT: %u\n", sd_card_info->csd.permanent_write_protect);
+        printf("\t\tTEMP_WRITE_PROTECT: %u\n", sd_card_info->csd.temp_write_protect);
+        printf("\t\tWRITE_BL_LEN: %u\n", sd_card_info->csd.max_write_blk_length);
+        printf("\t\tWRITE_BL_PARTIAL: %u\n", sd_card_info->csd.part_blk_write);
+        printf("\t\tWP_GRP_SIZE: %u\n", sd_card_info->csd.write_protect_group_size);
+        printf("\t\tWP_GRP_ENABLE: %u\n", sd_card_info->csd.write_protect_group_enable);
 
         return CLI_OK;
     }
 
     if(!strcmp(argv[1], "rb")) {
         uint8_t buffer[512]; // TODO: fix to use sd_card_info->block_size or specify size;
-        uint32_t address;
-        if(CLI_Ha2i(argv[2], &address)){
-            sdio_error_t res = sd_mmc_read(buffer, address << 9, sizeof(buffer));
+        uint32_t block;
+        if(CLI_Ha2i(argv[2], &block)){
+            sdio_error_t res = sd_mmc_read(buffer, block, 1);
             if(res == SD_OK){
                 dump_buffer(buffer, sizeof(buffer));
             }else{

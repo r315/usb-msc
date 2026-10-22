@@ -22,12 +22,12 @@ static card_info_t card_info; /* Information of last initialized card */
 static sdio_handle_t sdio_handle;
 
 /**
- * @brief  Get the exponent of the most significant that is set.
+ * @brief  Get exponent of the most significant bit that is set.
  *
- * @param  number_of_bytes: number of bytes.
+ * @param  number_of_bytes:
  * @retval exponent
  */
-static uint8_t convert_from_bytes_to_power_of_two(uint16_t number_of_bytes)
+uint8_t power_of_two(uint16_t number_of_bytes)
 {
     uint8_t count = 0;
 
@@ -827,7 +827,7 @@ static sdio_error_t sdio_switch_speed(uint32_t mode, uint32_t group, uint8_t val
     SDIOx->dtctrl = 0x0;
 
     blk_size = 64;
-    power = convert_from_bytes_to_power_of_two(blk_size);
+    power = power_of_two(blk_size);
     /* Set data length */
     status = sd_cmd16(blk_size);
 
@@ -2011,7 +2011,7 @@ sdio_error_t sd_mmc_read(uint8_t *buf, uint64_t block, uint32_t count)
         return SD_LOCK_UNLOCK_ERROR;
     }
 
-    power = convert_from_bytes_to_power_of_two(blk_size);
+    power = power_of_two(blk_size);
     sdio_data_init_struct.block_size = (sdio_block_size_type)(power);
     sdio_data_init_struct.data_length = count << power;
     sdio_data_init_struct.timeout = SD_DATATIMEOUT;
@@ -2075,7 +2075,7 @@ sdio_error_t sd_block_multi_read(uint8_t *buf, long long addr,
     if ((blk_size > 0) && (blk_size <= 2048) &&
         ((blk_size & (blk_size - 1)) == 0))
     {
-        power = convert_from_bytes_to_power_of_two(blk_size);
+        power = power_of_two(blk_size);
 
         /* send cmd16, set block size */
         sdio_command_init_struct.argument = blk_size;
@@ -2172,7 +2172,7 @@ sdio_error_t sd_block_write(const uint8_t *buf, long long addr,
     if ((blk_size > 0) && (blk_size <= 2048) &&
         ((blk_size & (blk_size - 1)) == 0))
     {
-        power = convert_from_bytes_to_power_of_two(blk_size);
+        power = power_of_two(blk_size);
 
         /* send cmd16, set block size */
         sdio_command_init_struct.argument = blk_size;
@@ -2298,7 +2298,7 @@ sdio_error_t sd_block_multi_write(const uint8_t *buf, long long addr,
     if ((blk_size > 0) && (blk_size <= 2048) &&
         ((blk_size & (blk_size - 1)) == 0))
     {
-        power = convert_from_bytes_to_power_of_two(blk_size);
+        power = power_of_two(blk_size);
 
         /* send cmd16, set block size */
         sdio_command_init_struct.argument = blk_size;

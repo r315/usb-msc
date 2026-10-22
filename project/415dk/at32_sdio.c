@@ -1775,21 +1775,27 @@ card_info_t *sd_mmc_card_info(void)
  * @param  nblks: amount of erasing data block
  * @retval sdio_error_t: sd card error code.
  */
-sdio_error_t sd_block_erase(uint64_t addr, uint32_t nblks)
+sdio_error_t sd_mmc_erase(uint64_t addr, uint32_t nblks)
 {
     sdio_error_t status = SD_OK;
-    uint32_t start_addr = 0, end_addr = 0, response = 0;
+    uint32_t sblock, eblock;
     uint8_t card_state;
 
-    if (card_info.type == SDIO_HIGH_CAPACITY_SD_CARD)
+    /* check card locked */
+    if (sdio_response_get(SDIOx, SDIO_RSP1_INDEX) & SD_CARD_LOCKED)
     {
-        start_addr = addr >> 9;
-        end_addr = start_addr + nblks - 1;
+        return SD_LOCK_UNLOCK_ERROR;
+    }
+
+    if (SDIO_HIGH_CAPACITY_SD_CARD == card_info.type)
+    {
+        sblock = addr;
+        eblock = sblock + nblks - 1;
     }
     else
     {
-        start_addr = addr;
-        end_addr = start_addr + (nblks - 1) * 512;
+        sblock = addr << 9;
+        eblock = sblock + ((nblks - 1) << 9);
     }
 
     /* clear dcsm configuration */
@@ -1798,33 +1804,20 @@ sdio_error_t sd_block_erase(uint64_t addr, uint32_t nblks)
     sdio_data_init_struct.timeout = SD_DATATIMEOUT;
     sdio_data_init_struct.transfer_direction = SDIO_DATA_TRANSFER_TO_CARD;
     sdio_data_init_struct.transfer_mode = SDIO_DATA_BLOCK_TRANSFER;
-
     sdio_data_config(SDIOx, &sdio_data_init_struct);
     sdio_data_state_machine_enable(SDIOx, FALSE);
 
-    response = sdio_response_get(SDIOx, SDIO_RSP1_INDEX);
-
-    /* check card locked */
-    if (response & SD_CARD_LOCKED)
-    {
-        return SD_LOCK_UNLOCK_ERROR;
-    }
-
-    if (card_info.type == SDIO_MULTIMEDIA_CARD ||
-        card_info.type == SDIO_HIGH_SPEED_MULTIMEDIA_CARD)
+    if (SDIO_MULTIMEDIA_CARD == card_info.type ||
+        SDIO_HIGH_SPEED_MULTIMEDIA_CARD == card_info.type)
     {
         /* send cmd35, set erase group start */
-        sdio_command_init_struct.argument = start_addr;
-        sdio_command_init_struct.cmd_index = SD_CMD_ERASE_GRP_START;
+        sdio_command_init_struct.argument = sblock;
+        sdio_command_init_struct.cmd_index = SD_CMD_ERASE_GROUP_START;
         sdio_command_init_struct.rsp_type = SDIO_RESPONSE_SHORT;
         sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
-
-        /* sdio command config */
         sdio_command_config(SDIOx, &sdio_command_init_struct);
-        /* enable ccsm */
         sdio_command_state_machine_enable(SDIOx, TRUE);
-
-        status = sd_rsp1(SD_CMD_ERASE_GRP_START);
+        status = sd_rsp1(SD_CMD_ERASE_GROUP_START);
 
         if (status != SD_OK)
         {
@@ -1832,31 +1825,11 @@ sdio_error_t sd_block_erase(uint64_t addr, uint32_t nblks)
         }
 
         /* send cmd36, set erase group end */
-        sdio_command_init_struct.argument = end_addr;
-        sdio_command_init_struct.cmd_index = SD_CMD_ERASE_GRP_END;
-
-        /* sdio command config */
+        sdio_command_init_struct.argument = eblock;
+        sdio_command_init_struct.cmd_index = SD_CMD_ERASE_GROUP_END;
         sdio_command_config(SDIOx, &sdio_command_init_struct);
-        /* enable ccsm */
         sdio_command_state_machine_enable(SDIOx, TRUE);
-
-        status = sd_rsp1(SD_CMD_ERASE_GRP_END);
-
-        if (status != SD_OK)
-        {
-            return status;
-        }
-
-        /* send cmd38, start erase gourp */
-        sdio_command_init_struct.argument = 0;
-        sdio_command_init_struct.cmd_index = SD_CMD_ERASE;
-
-        /* sdio command config */
-        sdio_command_config(SDIOx, &sdio_command_init_struct);
-        /* enable ccsm */
-        sdio_command_state_machine_enable(SDIOx, TRUE);
-
-        status = sd_rsp1(SD_CMD_ERASE);
+        status = sd_rsp1(SD_CMD_ERASE_GROUP_END);
 
         if (status != SD_OK)
         {
@@ -1866,17 +1839,13 @@ sdio_error_t sd_block_erase(uint64_t addr, uint32_t nblks)
     else
     {
         /* send cmd32, set erase block start */
-        sdio_command_init_struct.argument = start_addr;
-        sdio_command_init_struct.cmd_index = SD_CMD_SD_ERASE_GRP_START;
+        sdio_command_init_struct.argument = sblock;
+        sdio_command_init_struct.cmd_index = SD_CMD_ERASE_WR_BLK_START;
         sdio_command_init_struct.rsp_type = SDIO_RESPONSE_SHORT;
         sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
-
-        /* sdio command config */
         sdio_command_config(SDIOx, &sdio_command_init_struct);
-        /* enable ccsm */
         sdio_command_state_machine_enable(SDIOx, TRUE);
-
-        status = sd_rsp1(SD_CMD_SD_ERASE_GRP_START);
+        status = sd_rsp1(SD_CMD_ERASE_WR_BLK_START);
 
         if (status != SD_OK)
         {
@@ -1884,31 +1853,11 @@ sdio_error_t sd_block_erase(uint64_t addr, uint32_t nblks)
         }
 
         /* send cmd33, set erase block end */
-        sdio_command_init_struct.argument = end_addr;
-        sdio_command_init_struct.cmd_index = SD_CMD_SD_ERASE_GRP_END;
-
-        /* sdio command config */
+        sdio_command_init_struct.argument = eblock;
+        sdio_command_init_struct.cmd_index = SD_CMD_ERASE_WR_BLK_END;
         sdio_command_config(SDIOx, &sdio_command_init_struct);
-        /* enable ccsm */
         sdio_command_state_machine_enable(SDIOx, TRUE);
-
-        status = sd_rsp1(SD_CMD_SD_ERASE_GRP_END);
-
-        if (status != SD_OK)
-        {
-            return status;
-        }
-
-        /* send cmd38, start erase block */
-        sdio_command_init_struct.argument = 0;
-        sdio_command_init_struct.cmd_index = SD_CMD_ERASE;
-
-        /* sdio command config */
-        sdio_command_config(SDIOx, &sdio_command_init_struct);
-        /* enable ccsm */
-        sdio_command_state_machine_enable(SDIOx, TRUE);
-
-        status = sd_rsp1(SD_CMD_ERASE);
+        status = sd_rsp1(SD_CMD_ERASE_WR_BLK_END);
 
         if (status != SD_OK)
         {
@@ -1916,13 +1865,23 @@ sdio_error_t sd_block_erase(uint64_t addr, uint32_t nblks)
         }
     }
 
-    status = sd_programming_status(&card_state);
+    /* send cmd38, start erase*/
+    sdio_command_init_struct.argument = 0;
+    sdio_command_init_struct.cmd_index = SD_CMD_ERASE;
+    sdio_command_config(SDIOx, &sdio_command_init_struct);
+    sdio_command_state_machine_enable(SDIOx, TRUE);
+    status = sd_rsp1(SD_CMD_ERASE);
 
-    while ((status == SD_OK) && ((card_state == SD_CARD_PROGRAMMING) ||
-                                 (card_state == SD_CARD_RECEIVING)))
+    if (status != SD_OK)
     {
-        status = sd_programming_status(&card_state);
+        return status;
     }
+
+    do{
+        status = sd_programming_status(&card_state);
+
+    }while ((status == SD_OK) && ((card_state == SD_CARD_PROGRAMMING) ||
+                                  (card_state == SD_CARD_RECEIVING)));
 
     return status;
 }

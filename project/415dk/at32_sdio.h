@@ -27,7 +27,7 @@
 #define SD_CMD_SET_REL_ADDR              ((uint8_t)3)
 #define SD_CMD_SET_DSR                   ((uint8_t)4)
 #define SD_CMD_SDIO_SEN_OP_COND          ((uint8_t)5)
-#define SD_CMD_HS_SWITCH                 ((uint8_t)6)
+#define SD_CMD_SWITCH_FUNC                ((uint8_t)6)
 #define SD_CMD_SEL_DESEL_CARD            ((uint8_t)7)
 #define SD_CMD_HS_SEND_EXT_CSD           ((uint8_t)8)
 #define SD_CMD_SEND_CSD                  ((uint8_t)9)

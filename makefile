@@ -157,7 +157,7 @@ MCU = $(CPU) $(FPU) $(FLOAT_ABI)
 ifdef RELEASE
 OPT   =-O2
 else
-OPT   =-Og -g -gdwarf-2 -Wall #-Wextra
+OPT   =-O0 -g -gdwarf-2 -Wall #-Wextra
 endif
 
 ifndef V

@@ -5,7 +5,6 @@
 #include "board.h"
 
 static sdio_error_t mmc_switch(uint8_t set, uint8_t index, uint8_t value);
-static sdio_error_t sdio_switch_speed(uint32_t mode, uint32_t group, uint8_t value, uint8_t *rsp);
 static void sd_dma_config(uint32_t *mbuf, uint32_t buf_size, dma_dir_type dir);
 
 static sdio_command_struct_type sdio_command_init_struct;
@@ -368,14 +367,14 @@ static sdio_error_t sd_cmd6(uint32_t argument)
 {
     sdio_command_struct_type sdio_cmd = {
         .argument = argument,
-        .cmd_index = SD_CMD_HS_SWITCH,
+        .cmd_index = SD_CMD_SWITCH_FUNC,
         .rsp_type = SDIO_RESPONSE_SHORT,
         .wait_type = SDIO_WAIT_FOR_NO
     };
 
     sd_cmdx_send(&sdio_cmd);
 
-    return sd_rsp1(SD_CMD_HS_SWITCH);
+    return sd_rsp1(SD_CMD_SWITCH_FUNC);
 }
 
 /**
@@ -728,71 +727,6 @@ static sdio_error_t sdio_command_data_send(sdio_command_struct_type *sdio_cmd,
     return status;
 }
 
-/**
- * @brief  set bus speed
- * @param  speed: 0,normal speed; 1,high speed.
- * @retval sdio_error_t: sd card error code.
- */
-static sdio_error_t sd_speed_change(uint8_t speed)
-{
-    sdio_error_t status = SD_OK;
-    uint8_t switch_sts[64];
-
-    if (speed > 1)
-    {
-        return SD_INVALID_PARAMETER;
-    }
-
-    /* check card type */
-    if ((SDIO_STD_CAPACITY_SD_CARD_V1_1 == card_info.type) ||
-        (SDIO_STD_CAPACITY_SD_CARD_V2_0 == card_info.type) ||
-        (SDIO_HIGH_CAPACITY_SD_CARD == card_info.type))
-    {
-        /* version 1.01 card does not support cmd6 */
-        if (card_info.scr.sd_spec == 0)
-        {
-            return speed == 0 ? SD_OK : SD_UNSUPPORTED_FEATURE;
-        }
-
-        /* check group 1 function support speed */
-        status = sdio_switch_speed(0, 0, speed, switch_sts);
-
-        if (status != SD_OK)
-        {
-            return status;
-        }
-
-        if ((switch_sts[13] & (1 << speed)) == 0)
-        {
-            return SD_SWITCH_ERROR;
-        }
-
-        /* read it back for confirmation */
-        status = sdio_switch_speed(1, 0, speed, switch_sts);
-
-        if (status != 0)
-        {
-            return status;
-        }
-
-        if ((switch_sts[16] & 0xF) != speed)
-        {
-            return SD_SWITCH_ERROR;
-        }
-    }
-    else if (card_info.type == SDIO_HIGH_SPEED_MULTIMEDIA_CARD)
-    {
-        status = mmc_switch(EXT_CSD_CMD_SET_NORMAL, EXT_CSD_BUS_WIDTH,
-                            (uint8_t)speed);
-
-        if (status != 0)
-        {
-            return status;
-        }
-    }
-
-    return status;
-}
 
 /**
  * @brief  switch sd card speed to high speed
@@ -802,7 +736,7 @@ static sdio_error_t sd_speed_change(uint8_t speed)
  * @param  rsp: switch status
  * @retval sdio_error_t: sd card error code.
  */
-static sdio_error_t sdio_switch_speed(uint32_t mode, uint32_t group, uint8_t value,
+static sdio_error_t sd_switch_speed(uint32_t mode, uint32_t group, uint8_t value,
                                       uint8_t *rsp)
 {
     sdio_error_t status = SD_OK;
@@ -835,7 +769,7 @@ static sdio_error_t sdio_switch_speed(uint32_t mode, uint32_t group, uint8_t val
     sdio_command_init_struct.argument = (mode << 31) | 0x00FFFFFF;
     sdio_command_init_struct.argument &= ~(0xF << (group * 4));
     sdio_command_init_struct.argument |= value << (group * 4);
-    sdio_command_init_struct.cmd_index = SD_CMD_HS_SWITCH;
+    sdio_command_init_struct.cmd_index = SD_CMD_SWITCH_FUNC;
     sdio_command_init_struct.rsp_type = SDIO_RESPONSE_SHORT;
     sdio_command_init_struct.wait_type = SDIO_WAIT_FOR_NO;
 
@@ -843,6 +777,72 @@ static sdio_error_t sdio_switch_speed(uint32_t mode, uint32_t group, uint8_t val
 
     return sdio_command_data_send(&sdio_command_init_struct,
                                   &sdio_data_init_struct, (uint32_t *)rsp);
+}
+
+/**
+ * @brief  set bus speed
+ * @param  speed: 0: normal speed; 1: high speed.
+ * @retval sdio_error_t: sd card error code.
+ */
+static sdio_error_t sd_speed_change(uint8_t speed)
+{
+    sdio_error_t status = SD_OK;
+    uint8_t switch_sts[64];
+
+    if (speed > 1)
+    {
+        return SD_INVALID_PARAMETER;
+    }
+
+    /* check card type */
+    if ((SDIO_STD_CAPACITY_SD_CARD_V1_1 == card_info.type) ||
+        (SDIO_STD_CAPACITY_SD_CARD_V2_0 == card_info.type) ||
+        (SDIO_HIGH_CAPACITY_SD_CARD == card_info.type))
+    {
+        /* version 1.01 card does not support cmd6 */
+        if (card_info.scr.sd_spec == 0)
+        {
+            return speed == 0 ? SD_OK : SD_UNSUPPORTED_FEATURE;
+        }
+
+        /* check group 1 function support speed */
+        status = sd_switch_speed(0, 0, speed, switch_sts);
+
+        if (status != SD_OK)
+        {
+            return status;
+        }
+
+        if ((switch_sts[13] & (1 << speed)) == 0)
+        {
+            return SD_SWITCH_ERROR;
+        }
+
+        /* read it back for confirmation */
+        status = sd_switch_speed(1, 0, speed, switch_sts);
+
+        if (status != 0)
+        {
+            return status;
+        }
+
+        if ((switch_sts[16] & 0xF) != speed)
+        {
+            return SD_SWITCH_ERROR;
+        }
+    }
+    else if (card_info.type == SDIO_HIGH_SPEED_MULTIMEDIA_CARD)
+    {
+        status = mmc_switch(EXT_CSD_CMD_SET_NORMAL, EXT_CSD_BUS_WIDTH,
+                            (uint8_t)speed);
+
+        if (status != 0)
+        {
+            return status;
+        }
+    }
+
+    return status;
 }
 
 /**
@@ -1180,7 +1180,7 @@ static sdio_error_t sd_mmc_power_on(void)
     }
 
     /* config sdio clock divide and edge phase */
-    sdio_clock_config(SDIOx, clk_psc, SDIO_CLOCK_EDGE_FALLING);
+    sdio_clock_config(SDIOx, clk_psc, SDIO_CLOCK_EDGE_RISING);
     /* config sdio bus width to single bit */
     sdio_bus_width_config(SDIOx, SDIO_BUS_WIDTH_D1);
     /* disable flow control */
@@ -1712,6 +1712,8 @@ sdio_error_t sd_mmc_card_init(void)
 
     /* set transfer mode */
     sdio_handle.device_mode = SDIOx_TRANSFER_MODE;
+
+#if 0
     if (status == SD_OK)
     {
         /* set normal speed */
@@ -1744,13 +1746,14 @@ sdio_error_t sd_mmc_card_init(void)
         /* set sdio clock divider */
         sdio_clock_config(SDIOx, clkdiv, SDIO_CLOCK_EDGE_FALLING);
     }
-
+#endif
+#if 0
     if (status == SD_OK)
     {
         /* Set data width */
         status = sd_bus_wide_operation_config(SDIO_BUS_WIDTH_D4);
     }
-
+#endif
     return status;
 }
 

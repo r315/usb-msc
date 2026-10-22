@@ -144,7 +144,7 @@ static int sdCardCmd(int argc, char **argv)
         printf("\tCapacity: %uMiB\n", (unsigned int)(sd_card_info->capacity >> 20));
         printf("\tBlock size: %lu bytes\n", sd_card_info->block_size);
         uint32_t tblocks = (uint32_t)(sd_card_info->capacity >> power_of_two(sd_card_info->block_size));
-        printf("\tTotal blocks: %lu (0x%08x)\n", tblocks, tblocks);
+        printf("\tTotal blocks: %lu (0x%08lx)\n", tblocks, tblocks);
         printf("\tRelative card address (RCA): %lu\n", sd_card_info->rca);
         /* SCR */
         printf("\tSCR\n");
@@ -201,7 +201,7 @@ static int sdCardCmd(int argc, char **argv)
     if(!strcmp(argv[1], "st")) {
         uint32_t status;
         sd_mmc_status_read(&status);
-        printf("Card status: %lu\n", status);
+        printf("Card status: 0x%08lx\n", status);
         return CLI_OK;
     }
 
